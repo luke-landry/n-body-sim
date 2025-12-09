@@ -6,5 +6,13 @@
     },
     "workspaceMount": "source=${localWorkspaceFolder},target=/home/dev/n-body-sim,type=bind",
     "workspaceFolder": "/home/dev/n-body-sim",
-    "remoteUser": "dev"
+    "remoteUser": "dev",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "rust-lang.rust-analyzer",
+                "mechatroner.rainbow-csv"
+            ]
+        }
+    }
 }
