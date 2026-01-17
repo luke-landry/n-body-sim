@@ -1,24 +1,57 @@
-mod physics;
+mod constants;
+mod gravity;
+mod input;
+mod integrators;
+mod output;
+mod simulation;
 
-use physics::InitialCondition;
 use clap::Parser;
-use csv::Reader;
 use std::{error::Error, path::PathBuf};
 
 #[derive(Parser)]
 struct Args {
-
+    /// Path to CSV file containing initial conditions for each body
     #[arg(short, long)]
-    initial_conditions: PathBuf,
+    initial_conditions_path: PathBuf,
+
+    /// Path to CSV file to save simulation output data
+    #[arg(short, long, default_value = "n-body-sim-output.csv")]
+    output_data_path: PathBuf,
+
+    /// The gravitional constant to use in gravitational force calculations
+    #[arg(long, default_value_t=constants::G)]
+    g_constant: f64,
+
+    /// Simulation time step in seconds
+    #[arg(long, default_value_t = constants::DEFAULT_TIMESTEP)]
+    time_step: f64,
+
+    /// Number of time steps to simulate
+    #[arg(long, default_value_t = constants::DEFAULT_NUM_STEPS)]
+    num_steps: usize,
+
+    /// The softening factor to avoid numerical instability as distances approach zero
+    #[arg(long, default_value_t = constants::DEFAULT_SOFTENING_FACTOR)]
+    softening_factor: f64,
 }
 
-fn main() -> Result<(), Box<dyn Error>>{
+fn main() -> Result<(), Box<dyn Error>> {
     println!("n-body-sim");
-    
+
     let args = Args::parse();
-    let mut rdr = Reader::from_path(args.initial_conditions)?;
-    let initial_conditions: Vec<InitialCondition> =
-        rdr.deserialize().collect::<Result<_,_>>()?;
+
+    let bodies = input::load_bodies(&args.initial_conditions_path)?;
+
+    let parameters = simulation::Parameters::new(
+        args.time_step,
+        args.num_steps,
+        args.g_constant,
+        args.softening_factor,
+    );
+
+    let data = simulation::run(bodies, parameters);
+
+    output::save_to_csv(&args.output_data_path, data)?;
 
     Ok(())
 }

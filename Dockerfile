@@ -23,3 +23,5 @@ RUN groupadd --gid $USER_GID $USERNAME \
 WORKDIR /home/$USERNAME/n-body-sim
 
 USER $USERNAME
+
+RUN rustup component add clippy rustfmt
