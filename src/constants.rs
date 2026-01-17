@@ -11,3 +11,9 @@ pub const DEFAULT_NUM_STEPS: usize = 8760;
 
 /// Default softening factor (m): 1000 km
 pub const DEFAULT_SOFTENING_FACTOR: f64 = 1e6;
+
+/// Default gravity force calculation method
+pub const DEFAULT_GRAVITY: &str = "newton";
+
+/// Default integrator for computing next-step state
+pub const DEFAULT_INTEGRATOR: &str = "euler";

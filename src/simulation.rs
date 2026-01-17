@@ -1,16 +1,8 @@
-use serde::Deserialize;
+use crate::gravity::Gravity;
+use crate::input::InitialCondition;
+use crate::integrators::Integrator;
 
 const ZERO_VECTOR: [f64; 2] = [0.0, 0.0];
-
-#[derive(Deserialize, Debug)]
-pub struct InitialCondition {
-    name: String,
-    mass: f64,
-    pos_x: f64,
-    pos_y: f64,
-    vel_x: f64,
-    vel_y: f64,
-}
 
 pub struct Body {
     name: String,
@@ -67,6 +59,36 @@ pub struct BodySnapshot {
 
 pub type Data = Vec<BodySnapshot>;
 
-pub fn run(bodies: Vec<Body>, parameters: Parameters) -> Data {
-    vec![]
+pub struct Simulator {
+    bodies: Vec<Body>,
+    parameters: Parameters,
+    gravity: Box<dyn Gravity>,
+    integrator: Box<dyn Integrator>,
+    data: Data,
+    step_count: usize,
+}
+
+impl Simulator {
+    pub fn new(
+        bodies: Vec<Body>,
+        parameters: Parameters,
+        gravity: Box<dyn Gravity>,
+        integrator: Box<dyn Integrator>,
+    ) -> Self {
+        // The number of calculated results will be # of bodies * # of steps
+        let num_results = bodies.len() * parameters.num_steps;
+
+        Simulator {
+            bodies,
+            parameters,
+            gravity,
+            integrator,
+            data: Vec::with_capacity(num_results),
+            step_count: 0,
+        }
+    }
+
+    pub fn run(&mut self) -> Data {
+        vec![]
+    }
 }
