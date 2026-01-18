@@ -9,11 +9,14 @@ pub const DEFAULT_TIMESTEP: f64 = 3600.0;
 /// assuming default timestep of 1 hour is used
 pub const DEFAULT_NUM_STEPS: usize = 8760;
 
-/// Default softening factor (m): 1000 km
-pub const DEFAULT_SOFTENING_FACTOR: f64 = 1e6;
+/// Default softening factor (m): 100 km
+pub const DEFAULT_SOFTENING_FACTOR: f64 = 1e5;
 
 /// Default gravity force calculation method
 pub const DEFAULT_GRAVITY: &str = "newton";
 
 /// Default integrator for computing next-step state
 pub const DEFAULT_INTEGRATOR: &str = "euler";
+
+/// Default theta value for barnes hut gravity calculations
+pub const DEFAULT_THETA: f64 = 0.5;

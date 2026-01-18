@@ -11,6 +11,8 @@ use integrators::{Integrator, euler::EulerIntegrator};
 use simulation::Simulator;
 use std::{error::Error, path::PathBuf};
 
+use crate::{gravity::barnes_hut::BarnesHutGravity, simulation::Parameters};
+
 #[derive(Parser)]
 struct Args {
     /// Path to CSV file containing initial conditions for each body
@@ -37,6 +39,10 @@ struct Args {
     #[arg(long, default_value_t = constants::DEFAULT_SOFTENING_FACTOR)]
     softening_factor: f64,
 
+    /// Theta value for Barnes-Hut gravity calculation method
+    #[arg(long, default_value_t = constants::DEFAULT_THETA)]
+    theta: f64,
+
     /// Gravity force calculation method
     #[arg(long, default_value = constants::DEFAULT_GRAVITY)]
     gravity: GravityMethod,
@@ -49,12 +55,21 @@ struct Args {
 #[derive(Clone, ValueEnum)]
 enum GravityMethod {
     Newton,
+    BarnesHut,
 }
 
 impl GravityMethod {
-    pub fn create(&self) -> Box<dyn Gravity> {
+    pub fn create(&self, parameters: &Parameters) -> Box<dyn Gravity> {
         match self {
-            GravityMethod::Newton => Box::new(NewtonGravity),
+            GravityMethod::Newton => Box::new(NewtonGravity::new(
+                parameters.g_constant,
+                parameters.softening_factor,
+            )),
+            GravityMethod::BarnesHut => Box::new(BarnesHutGravity::new(
+                parameters.g_constant,
+                parameters.softening_factor,
+                parameters.theta,
+            )),
         }
     }
 }
@@ -84,9 +99,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         args.num_steps,
         args.g_constant,
         args.softening_factor,
+        args.theta,
     );
 
-    let gravity = args.gravity.create();
+    let gravity = args.gravity.create(&parameters);
 
     let integrator = args.integrator.create();
 

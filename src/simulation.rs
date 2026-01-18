@@ -5,11 +5,23 @@ use crate::integrators::Integrator;
 const ZERO_VECTOR: [f64; 2] = [0.0, 0.0];
 
 pub struct Body {
-    name: String,
-    mass: f64,
-    position: [f64; 2],
-    velocity: [f64; 2],
-    acceleration: [f64; 2],
+    pub name: String,
+    pub mass: f64,
+    pub position: [f64; 2],
+    pub velocity: [f64; 2],
+    pub acceleration: [f64; 2],
+}
+
+impl Body {
+    pub fn new(name: String, mass: f64, position: [f64; 2], velocity: [f64; 2]) -> Self {
+        Body {
+            name,
+            mass,
+            position,
+            velocity,
+            acceleration: ZERO_VECTOR,
+        }
+    }
 }
 
 impl From<InitialCondition> for Body {
@@ -26,26 +38,36 @@ impl From<InitialCondition> for Body {
 
 pub struct Parameters {
     /// Time step size in seconds
-    time_step: f64,
+    pub time_step: f64,
 
     /// Number of time steps to simulate
-    num_steps: usize,
+    pub num_steps: usize,
 
     /// The gravitational constant to use for gravitational force calculations
-    g_constant: f64,
+    pub g_constant: f64,
 
     /// The softening factor used to prevent numerical instability
     /// when the distance between two bodies approaches zero
-    softening_factor: f64,
+    pub softening_factor: f64,
+
+    /// The theta value used in Barnes-Hut gravity force calculations
+    pub theta: f64,
 }
 
 impl Parameters {
-    pub fn new(time_step: f64, num_steps: usize, g_constant: f64, softening_factor: f64) -> Self {
+    pub fn new(
+        time_step: f64,
+        num_steps: usize,
+        g_constant: f64,
+        softening_factor: f64,
+        theta: f64,
+    ) -> Self {
         Parameters {
             time_step,
             num_steps,
             g_constant,
             softening_factor,
+            theta,
         }
     }
 }
