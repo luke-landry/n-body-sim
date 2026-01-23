@@ -1,6 +1,9 @@
 /// Value of the 2022 CODATA Newtonian constant of gravitation as defined in
 /// https://physics.nist.gov/cgi-bin/cuu/Value?bg
-pub const G: f64 = 6.67430e-11; // m^3 kg^-1 s^-2
+// pub const G: f64 = 6.67430e-11; // m^3 kg^-1 s^-2
+
+/// Default G value (1 for simplicity)
+pub const DEFAULT_G: f64 = 1.0;
 
 /// Default simulation timestep (s): 3600 seconds = 1 hour
 pub const DEFAULT_TIMESTEP: f64 = 3600.0;

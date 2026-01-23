@@ -52,7 +52,7 @@ impl NewtonGravity {
     we have
         a_ix = ∑(j=1..N, j != i){ k*m_j*∆x }
         a_iy = ∑(j=1..N, j != i){ k*m_j*∆y }
-    where computing k once saves having to recalculate the full formula twice per body pair.
+    where computing k once per (i,j) saves having to recalculate the full formula twice (for x and y)
 
     By Newton's 3rd law, the force between a pair of bodies is equal and opposite:
         F_i = -F_j
@@ -74,7 +74,7 @@ impl Gravity for NewtonGravity {
         let epsilon_squared = self.softening_factor.powi(2);
         let n = bodies.len();
         let mut a = vec![[0.0, 0.0]; n];
-        
+
         for i in 0..n {
             for j in i + 1..n {
                 let m_i = bodies[i].mass;
@@ -95,5 +95,183 @@ impl Gravity for NewtonGravity {
             }
         }
         a
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::simulation::Body;
+
+    const MINIMUM_VALUE: f64 = 1e-10;
+    const RELATIVE_PRECISION: f64 = 1e-5;
+
+    fn within_tolerance(calculated: f64, expected: f64) -> bool {
+        println!("calculated: {:e}, expected: {:e}", calculated, expected);
+
+        // Negligible differences pass
+        if expected.abs() < MINIMUM_VALUE && calculated.abs() < MINIMUM_VALUE {
+            return true
+        }
+
+        ((calculated - expected).abs()) / expected.abs() < RELATIVE_PRECISION
+    }
+
+    #[test]
+    fn test_single_body_no_acceleration() {
+        let gravity = NewtonGravity::new(1.0, 1.0);
+        let bodies = vec![Body {
+            name: "body1".to_string(),
+            mass: 100.0,
+            position: [0.0, 0.0],
+            velocity: [0.0, 0.0],
+            acceleration: [0.0, 0.0],
+        }];
+
+        let accelerations = gravity.calculate_accelerations(&bodies);
+
+        // A single body should have no acceleration
+        assert_eq!(accelerations.len(), 1);
+        assert_eq!(within_tolerance(accelerations[0][0], 0.0), true);
+        assert_eq!(within_tolerance(accelerations[0][1], 0.0), true);
+    }
+
+    #[test]
+    fn test_two_equal_masses_symmetric_acceleration() {
+        let gravity = NewtonGravity::new(1.0, 0.0);
+        let bodies = vec![
+            Body {
+                name: "body1".to_string(),
+                mass: 12.5,
+                position: [0.0, 0.0],
+                velocity: [0.0, 0.0],
+                acceleration: [0.0, 0.0],
+            },
+            Body {
+                name: "body2".to_string(),
+                mass: 12.5,
+                position: [5.0, 0.0],
+                velocity: [0.0, 0.0],
+                acceleration: [0.0, 0.0],
+            },
+        ];
+
+        let accelerations = gravity.calculate_accelerations(&bodies);
+
+        // Two equal masses should accelerate equally towards each other
+        assert_eq!(accelerations.len(), 2);
+        assert_eq!(within_tolerance(accelerations[0][0], 0.5), true);
+        assert_eq!(within_tolerance(accelerations[0][1], 0.0), true);
+        assert_eq!(within_tolerance(accelerations[1][0], -0.5), true);
+        assert_eq!(within_tolerance(accelerations[1][1], 0.0), true);
+    }
+
+    #[test]
+    fn test_two_different_masses_unequal_acceleration() {
+        let gravity = NewtonGravity::new(1.0, 1.0);
+        let bodies = vec![
+            Body {
+                name: "small_mass".to_string(),
+                mass: 1.0,
+                position: [0.0, 0.0],
+                velocity: [0.0, 0.0],
+                acceleration: [0.0, 0.0],
+            },
+            Body {
+                name: "large_mass".to_string(),
+                mass: 1.0,
+                position: [0.0, 0.0],
+                velocity: [0.0, 0.0],
+                acceleration: [0.0, 0.0],
+            },
+        ];
+
+        let accelerations = gravity.calculate_accelerations(&bodies);
+
+        // Small mass should accelerate faster than large mass
+        assert_eq!(accelerations.len(), 2);
+        // TODO acceleration assertions
+    }
+
+    #[test]
+    fn test_three_bodies_varying_masses() {
+        let gravity = NewtonGravity::new(1.0, 1.0);
+        let bodies = vec![
+            Body {
+                name: "body1".to_string(),
+                mass: 1.0,
+                position: [0.0, 0.0],
+                velocity: [0.0, 0.0],
+                acceleration: [0.0, 0.0],
+            },
+            Body {
+                name: "body2".to_string(),
+                mass: 1.0,
+                position: [0.0, 0.0],
+                velocity: [0.0, 0.0],
+                acceleration: [0.0, 0.0],
+            },
+            Body {
+                name: "body3".to_string(),
+                mass: 1.0,
+                position: [0.0, 0.0],
+                velocity: [0.0, 0.0],
+                acceleration: [0.0, 0.0],
+            },
+        ];
+
+        let accelerations = gravity.calculate_accelerations(&bodies);
+
+        // Three bodies with varying masses should each have accelerations from both other bodies
+        assert_eq!(accelerations.len(), 3);
+        // TODO acceleration assertions
+    }
+
+    #[test]
+    fn test_five_bodies_varying_masses() {
+        let gravity = NewtonGravity::new(6.674e-11, 1.0);
+        let bodies = vec![
+            Body {
+                name: "body1".to_string(),
+                mass: 1.0,
+                position: [0.0, 0.0],
+                velocity: [0.0, 0.0],
+                acceleration: [0.0, 0.0],
+            },
+            Body {
+                name: "body2".to_string(),
+                mass: 1.0,
+                position: [0.0, 0.0],
+                velocity: [0.0, 0.0],
+                acceleration: [0.0, 0.0],
+            },
+            Body {
+                name: "body3".to_string(),
+                mass: 0.0,
+                position: [0.0, 0.0],
+                velocity: [0.0, 0.0],
+                acceleration: [0.0, 0.0],
+            },
+            Body {
+                name: "body4".to_string(),
+                mass: 0.0,
+                position: [0.0, 0.0],
+                velocity: [0.0, 0.0],
+                acceleration: [0.0, 0.0],
+            },
+            Body {
+                name: "body5".to_string(),
+                mass: 0.0,
+                position: [0.0, 0.0],
+                velocity: [0.0, 0.0],
+                acceleration: [0.0, 0.0],
+            },
+        ];
+
+        let accelerations = gravity.calculate_accelerations(&bodies);
+
+        // Five bodies should each have accelerations from all four other bodies
+        assert_eq!(accelerations.len(), 5);
+        // TODO acceleration assertions
     }
 }

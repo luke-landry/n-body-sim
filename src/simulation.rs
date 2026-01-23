@@ -84,7 +84,6 @@ pub type Data = Vec<BodySnapshot>;
 pub struct Simulator {
     bodies: Vec<Body>,
     parameters: Parameters,
-    gravity: Box<dyn Gravity>,
     integrator: Box<dyn Integrator>,
     data: Data,
     step_count: usize,
@@ -94,7 +93,6 @@ impl Simulator {
     pub fn new(
         bodies: Vec<Body>,
         parameters: Parameters,
-        gravity: Box<dyn Gravity>,
         integrator: Box<dyn Integrator>,
     ) -> Self {
         // The number of calculated results will be # of bodies * # of steps
@@ -103,7 +101,6 @@ impl Simulator {
         Simulator {
             bodies,
             parameters,
-            gravity,
             integrator,
             data: Vec::with_capacity(num_results),
             step_count: 0,

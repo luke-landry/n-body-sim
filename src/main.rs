@@ -11,7 +11,10 @@ use integrators::{Integrator, euler::EulerIntegrator};
 use simulation::Simulator;
 use std::{error::Error, path::PathBuf};
 
-use crate::{gravity::barnes_hut::BarnesHutGravity, simulation::Parameters};
+use crate::{
+    gravity::barnes_hut::BarnesHutGravity, integrators::velocity_verlet::VelocityVerletIntegrator,
+    simulation::Parameters,
+};
 
 #[derive(Parser)]
 struct Args {
@@ -24,7 +27,7 @@ struct Args {
     output_data_path: PathBuf,
 
     /// The gravitional constant to use in gravitational force calculations
-    #[arg(long, default_value_t=constants::G)]
+    #[arg(long, default_value_t=constants::DEFAULT_G)]
     g_constant: f64,
 
     /// Simulation time step in seconds
@@ -77,12 +80,14 @@ impl GravityMethod {
 #[derive(Clone, ValueEnum)]
 enum IntegratorMethod {
     Euler,
+    VelocityVerlet,
 }
 
 impl IntegratorMethod {
-    pub fn create(&self) -> Box<dyn Integrator> {
+    pub fn create(&self, gravity: Box<dyn Gravity>) -> Box<dyn Integrator> {
         match self {
-            IntegratorMethod::Euler => Box::new(EulerIntegrator),
+            IntegratorMethod::Euler => Box::new(EulerIntegrator::new(gravity)),
+            IntegratorMethod::VelocityVerlet => Box::new(VelocityVerletIntegrator::new(gravity)),
         }
     }
 }
@@ -104,9 +109,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let gravity = args.gravity.create(&parameters);
 
-    let integrator = args.integrator.create();
+    let integrator = args.integrator.create(gravity);
 
-    let mut simulator = Simulator::new(bodies, parameters, gravity, integrator);
+    let mut simulator = Simulator::new(bodies, parameters, integrator);
 
     let data = simulator.run();
 
