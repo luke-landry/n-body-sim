@@ -4,11 +4,11 @@
 
 pub const DEFAULT_G: f64 = 1.0;
 
-pub const DEFAULT_TIMESTEP: f64 = 1.0;
+pub const DEFAULT_TIMESTEP: f64 = 0.01;
 
-pub const DEFAULT_NUM_STEPS: usize = 50;
+pub const DEFAULT_NUM_STEPS: usize = 10000;
 
-pub const DEFAULT_SOFTENING_FACTOR: f64 = 1e-5;
+pub const DEFAULT_SOFTENING_FACTOR: f64 = 0.005;
 
 pub const DEFAULT_GRAVITY: &str = "newton";
 

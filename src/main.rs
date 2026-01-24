@@ -22,7 +22,7 @@ struct Args {
     #[arg(short, long)]
     initial_conditions_path: PathBuf,
 
-    /// Path to CSV file to save simulation output data (defaults to stdout if none provided)
+    /// Path to CSV file to save simulation output data (prints to stdout if none provided)
     #[arg(short, long)]
     output_data_path: Option<PathBuf>,
 
@@ -116,8 +116,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let data = simulator.run();
 
     match args.output_data_path {
-        Some(path) => {output::save_to_csv(&path, data)?;}
-        None => {output::print_data(data);}
+        Some(path) => {
+            output::save_to_csv(&path, data)?;
+        }
+        None => {
+            output::print_data(data);
+        }
     }
 
     Ok(())

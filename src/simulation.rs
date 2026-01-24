@@ -1,9 +1,5 @@
-use crate::gravity::Gravity;
-use crate::input::InitialCondition;
 use crate::integrators::Integrator;
-use std::fmt;
-
-const ZERO_VECTOR: [f64; 2] = [0.0, 0.0];
+use crate::output::BodySnapshot;
 
 pub struct Body {
     pub id: usize,
@@ -59,36 +55,6 @@ impl Parameters {
     }
 }
 
-pub struct BodySnapshot {
-    time: f64,
-    id: usize,
-    pos_x: f64,
-    pos_y: f64,
-}
-
-impl BodySnapshot {
-    fn create(body: &Body, time: f64) -> Self {
-        BodySnapshot {
-            time,
-            id: body.id,
-            pos_x: body.position[0],
-            pos_y: body.position[1],
-        }
-    }
-}
-
-impl fmt::Display for BodySnapshot {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Time: {:>10.4}s | Body {:>3} | Position: ({:>12.6}, {:>12.6})",
-            self.time, self.id, self.pos_x, self.pos_y
-        )
-    }
-}
-
-pub type Data = Vec<BodySnapshot>;
-
 pub struct Simulator {
     bodies: Vec<Body>,
     parameters: Parameters,
@@ -104,10 +70,10 @@ impl Simulator {
         }
     }
 
-    pub fn run(&mut self) -> Data {
+    pub fn run(&mut self) -> Vec<BodySnapshot> {
         // Precompute total results size to avoid memory reallocations
         let num_results = self.bodies.len() * (self.parameters.num_steps + 1);
-        let mut data: Data = Vec::with_capacity(num_results);
+        let mut data: Vec<BodySnapshot> = Vec::with_capacity(num_results);
 
         let mut record_state = |bodies: &[Body], time: f64| {
             data.extend(bodies.iter().map(|body| BodySnapshot::create(body, time)));
