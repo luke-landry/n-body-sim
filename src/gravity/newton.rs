@@ -67,6 +67,8 @@ impl NewtonGravity {
     iteration computing the effect of b2 on b1 can easily compute the effect of b1 on b2 as well.
     This means instead of iterating (i=1..N)*(j=1..N), we can iterate (i=1..N)*(j=i+1..N)
     This reduces the number of iterations we need to perform from (N^2)-N to (N*(N-1))/2.
+    The time complexity is still O(N^2), but this optimization effectively halves the # of
+    iterations compared to a naive implementation.
 */
 impl Gravity for NewtonGravity {
     fn calculate_accelerations(&self, bodies: &[Body]) -> Vec<[f64; 2]> {
@@ -111,7 +113,7 @@ mod tests {
 
         // Negligible differences pass
         if expected.abs() < MINIMUM_VALUE && calculated.abs() < MINIMUM_VALUE {
-            return true
+            return true;
         }
 
         ((calculated - expected).abs()) / expected.abs() < RELATIVE_PRECISION
@@ -121,11 +123,10 @@ mod tests {
     fn test_single_body_no_acceleration() {
         let gravity = NewtonGravity::new(1.0, 1.0);
         let bodies = vec![Body {
-            name: "body1".to_string(),
+            id: 0,
             mass: 100.0,
             position: [0.0, 0.0],
             velocity: [0.0, 0.0],
-            acceleration: [0.0, 0.0],
         }];
 
         let accelerations = gravity.calculate_accelerations(&bodies);
@@ -141,18 +142,16 @@ mod tests {
         let gravity = NewtonGravity::new(1.0, 0.0);
         let bodies = vec![
             Body {
-                name: "body1".to_string(),
+                id: 0,
                 mass: 12.5,
                 position: [0.0, 0.0],
                 velocity: [0.0, 0.0],
-                acceleration: [0.0, 0.0],
             },
             Body {
-                name: "body2".to_string(),
+                id: 1,
                 mass: 12.5,
                 position: [5.0, 0.0],
                 velocity: [0.0, 0.0],
-                acceleration: [0.0, 0.0],
             },
         ];
 
@@ -171,18 +170,16 @@ mod tests {
         let gravity = NewtonGravity::new(1.0, 1.0);
         let bodies = vec![
             Body {
-                name: "small_mass".to_string(),
+                id: 0,
                 mass: 1.0,
                 position: [0.0, 0.0],
                 velocity: [0.0, 0.0],
-                acceleration: [0.0, 0.0],
             },
             Body {
-                name: "large_mass".to_string(),
+                id: 1,
                 mass: 1.0,
                 position: [0.0, 0.0],
                 velocity: [0.0, 0.0],
-                acceleration: [0.0, 0.0],
             },
         ];
 
@@ -198,25 +195,22 @@ mod tests {
         let gravity = NewtonGravity::new(1.0, 1.0);
         let bodies = vec![
             Body {
-                name: "body1".to_string(),
+                id: 0,
                 mass: 1.0,
                 position: [0.0, 0.0],
                 velocity: [0.0, 0.0],
-                acceleration: [0.0, 0.0],
             },
             Body {
-                name: "body2".to_string(),
+                id: 1,
                 mass: 1.0,
                 position: [0.0, 0.0],
                 velocity: [0.0, 0.0],
-                acceleration: [0.0, 0.0],
             },
             Body {
-                name: "body3".to_string(),
+                id: 2,
                 mass: 1.0,
                 position: [0.0, 0.0],
                 velocity: [0.0, 0.0],
-                acceleration: [0.0, 0.0],
             },
         ];
 
@@ -232,39 +226,34 @@ mod tests {
         let gravity = NewtonGravity::new(6.674e-11, 1.0);
         let bodies = vec![
             Body {
-                name: "body1".to_string(),
+                id: 0,
                 mass: 1.0,
                 position: [0.0, 0.0],
                 velocity: [0.0, 0.0],
-                acceleration: [0.0, 0.0],
             },
             Body {
-                name: "body2".to_string(),
+                id: 1,
                 mass: 1.0,
                 position: [0.0, 0.0],
                 velocity: [0.0, 0.0],
-                acceleration: [0.0, 0.0],
             },
             Body {
-                name: "body3".to_string(),
+                id: 2,
                 mass: 0.0,
                 position: [0.0, 0.0],
                 velocity: [0.0, 0.0],
-                acceleration: [0.0, 0.0],
             },
             Body {
-                name: "body4".to_string(),
+                id: 3,
                 mass: 0.0,
                 position: [0.0, 0.0],
                 velocity: [0.0, 0.0],
-                acceleration: [0.0, 0.0],
             },
             Body {
-                name: "body5".to_string(),
+                id: 4,
                 mass: 0.0,
                 position: [0.0, 0.0],
                 velocity: [0.0, 0.0],
-                acceleration: [0.0, 0.0],
             },
         ];
 

@@ -22,9 +22,9 @@ struct Args {
     #[arg(short, long)]
     initial_conditions_path: PathBuf,
 
-    /// Path to CSV file to save simulation output data
-    #[arg(short, long, default_value = "n-body-sim-output.csv")]
-    output_data_path: PathBuf,
+    /// Path to CSV file to save simulation output data (defaults to stdout if none provided)
+    #[arg(short, long)]
+    output_data_path: Option<PathBuf>,
 
     /// The gravitional constant to use in gravitational force calculations
     #[arg(long, default_value_t=constants::DEFAULT_G)]
@@ -115,7 +115,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let data = simulator.run();
 
-    output::save_to_csv(&args.output_data_path, data)?;
+    match args.output_data_path {
+        Some(path) => {output::save_to_csv(&path, data)?;}
+        None => {output::print_data(data);}
+    }
 
     Ok(())
 }
