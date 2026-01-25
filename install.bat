@@ -37,6 +37,18 @@ if not exist "%REQ_FILE%" (
     exit /b 1
 )
 
+:: Ensure pip is available
+"%PYTHON_VENV%" -m pip --version >nul 2>&1
+if errorlevel 1 (
+    echo [INFO] Bootstrapping pip...
+    "%PYTHON_VENV%" -m ensurepip --upgrade
+    if errorlevel 1 (
+        echo [ERROR] Failed to install pip.
+        pause
+        exit /b 1
+    )
+)
+
 :: Upgrade pip
 echo [INFO] Upgrading pip in virtual environment...
 "%PYTHON_VENV%" -m pip install --upgrade pip
@@ -55,4 +67,4 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [SUCCESS] Python environment setup complete.
+echo [SUCCESS] Installation complete.
