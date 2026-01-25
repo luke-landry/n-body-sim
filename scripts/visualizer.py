@@ -8,7 +8,7 @@ import pyqtgraph as pg
 
 WINDOW_TITLE = "N-body Simulation Visualizer"
 
-DEFAULT_FILENAME = "output.csv"
+DEFAULT_FILENAME = "data/output.csv"
 
 # Default number of steps to show per second
 DEFAULT_STEP_RATE = 60
