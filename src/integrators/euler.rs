@@ -36,7 +36,9 @@ impl EulerIntegrator {
     next velocity. This sequence takes into account the current acceleration when
     updating position. So, in the orbiting two-body system example, this would result
     in the body being pulled more towards the center of gravity, which helps correct
-    for the overshoot.
+    for the overshoot. The semi-implicit Euler method is a "symplectic integrator"
+    which means it will maintain the long-term stability of the system by preventing
+    energy from drifting away over time.
 */
 impl Integrator for EulerIntegrator {
     fn step(&self, bodies: &mut Vec<Body>, time_step: f64) {
