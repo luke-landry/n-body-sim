@@ -1,5 +1,6 @@
 import sys, signal
 import pandas as pd
+import numpy as np
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QSlider, QLabel
 from PySide6.QtCore import Qt, QTimer
 # pyqtgraph needs to be imported after PySide6 to use it, otherwise it will try to use PyQt6
@@ -30,10 +31,6 @@ class Visualizer(QWidget):
     def __init__(self, df: pd.DataFrame, path, step_rate):
         super().__init__()
 
-        self.df = df
-        self.times = self.df.index.unique(level='time').to_numpy(dtype=float)
-        self.bodies = self.df.index.unique(level='id').to_numpy(dtype=int)
-
         self.path = path
 
         self.step = 0
@@ -43,12 +40,28 @@ class Visualizer(QWidget):
         self.timer.setInterval(round(1000 / step_rate))
         self.timer.timeout.connect(self.tick)
 
+        self.initialize_data(df)
         self.initialize_ui()
         self.initialize_plot()
         self.update(0)
 
-        print("Visualization launched, press play in the bottom left of the window to start")
-        print("To return to this terminal, close the simulation window or press Ctrl+C here")
+    def initialize_data(self, df: pd.DataFrame):
+        self.times = df.index.unique(level='time').to_numpy(dtype=float)
+        self.bodies = df.index.unique(level='id').to_numpy(dtype=int)
+        num_steps = len(self.times)
+        num_bodies = len(self.bodies)
+
+        # Precompute 3D numpy array [times, bodies, (x,y)]
+        self.data = np.empty((num_steps, num_bodies, 2), dtype=np.float64)
+        for body in self.bodies :
+            body_slice = df.xs(body, level='id')
+            self.data[:, body, 0] = body_slice['x'].to_numpy()
+            self.data[:, body, 1] = body_slice['y'].to_numpy()
+
+        # Compute metadata
+        initial_df = df.xs(self.times[0], level='time')
+        self.ix_min, self.ix_max = initial_df["x"].min(), initial_df["x"].max()
+        self.iy_min, self.iy_max = initial_df["y"].min(), initial_df["y"].max()
     
     def initialize_ui(self):
         self.setWindowTitle(WINDOW_TITLE)
@@ -65,17 +78,14 @@ class Visualizer(QWidget):
         self.time_label = QLabel("t = 0.00s")
         header.addWidget(self.time_label)
 
-        initial_df = self.df.xs(self.times[0], level='time')
-        ix_min, ix_max = initial_df["x"].min(), initial_df["x"].max()
-        iy_min, iy_max = initial_df["y"].min(), initial_df["y"].max()
-        margin_x = abs(ix_max - ix_min) * INITIAL_MARGIN
-        margin_y = abs(iy_max - iy_min) * INITIAL_MARGIN
+        margin_x = abs(self.ix_max - self.ix_min) * INITIAL_MARGIN
+        margin_y = abs(self.iy_max - self.iy_min) * INITIAL_MARGIN
 
         self.plot = pg.PlotWidget()
         self.plot.setAspectLocked(True)
         self.plot.showGrid(x=True, y=True)
-        self.plot.setXRange(ix_min, ix_max, padding=margin_x) # type: ignore
-        self.plot.setYRange(iy_min, iy_max, padding=margin_y) # type: ignore
+        self.plot.setXRange(self.ix_min, self.ix_max, padding=margin_x) # type: ignore
+        self.plot.setYRange(self.iy_min, self.iy_max, padding=margin_y) # type: ignore
         layout.addWidget(self.plot)  # type: ignore
 
         controls = QHBoxLayout()
@@ -111,18 +121,12 @@ class Visualizer(QWidget):
             self.plot.addItem(self.points[body])
             
     def update(self, step):
-        current_time = float(self.times[step])
-        self.time_label.setText(f"t = {current_time:.2f}s")
-
+        self.time_label.setText(f"t = {self.times[step]:.2f}s")
         starting_step = max(0, step - TRAIL_WINDOW)
-        time_window = self.times[starting_step : step + 1]
-        history = self.df.loc[time_window]
         for body in self.bodies:
-            body_history = history.xs(body, level='id')
-            x_history = body_history['x'].to_numpy(dtype=float)
-            y_history = body_history['y'].to_numpy(dtype=float)
-            self.trails[body].setData(x_history, y_history)
-            self.points[body].setData([x_history[-1]], [y_history[-1]])
+            trail = self.data[starting_step : step + 1, body]
+            self.trails[body].setData(trail[:, 0], trail[:, 1])
+            self.points[body].setData([trail[-1, 0]], [trail[-1, 1]])
 
     def tick(self):
         self.update(self.step)
@@ -173,5 +177,8 @@ visualizer.show()
 
 # this allows ctrl+c to work while the window is launched
 signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+print("Visualization launched, press play in the bottom left of the window to start")
+print("To return to this terminal, close the simulation window or press Ctrl+C here")
 
 sys.exit(app.exec())
