@@ -1,4 +1,7 @@
 # n-body-sim
+
+![figure-eight](images/figure-eight.png)
+
 An N-body gravitational simulator written in Rust. This project simulates the gravitational interactions between multiple celestial bodies using numerical integration methods. The core physics engine is written in Rust for performance, and the configuration and visualization GUI tools are written in Python using Qt bindings.
 
 ## Quick Start (GUI)
