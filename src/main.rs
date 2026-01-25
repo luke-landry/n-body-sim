@@ -27,15 +27,15 @@ struct Args {
     output_data_path: Option<PathBuf>,
 
     /// The gravitional constant to use in gravitational force calculations
-    #[arg(long, default_value_t=constants::DEFAULT_G)]
+    #[arg(short, long, default_value_t=constants::DEFAULT_G)]
     g_constant: f64,
 
     /// Simulation time step in seconds
-    #[arg(long, default_value_t = constants::DEFAULT_TIMESTEP)]
+    #[arg(short, long, default_value_t = constants::DEFAULT_TIMESTEP)]
     time_step: f64,
 
     /// Number of time steps to simulate
-    #[arg(long, default_value_t = constants::DEFAULT_NUM_STEPS)]
+    #[arg(short, long, default_value_t = constants::DEFAULT_NUM_STEPS)]
     num_steps: usize,
 
     /// The softening factor to avoid numerical instability as distances approach zero
