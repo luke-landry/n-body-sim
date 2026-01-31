@@ -1,3 +1,5 @@
+use glam::DVec3;
+
 use crate::{Integrator, gravity::Gravity, simulation::Body};
 
 pub struct VelocityVerletIntegrator {
@@ -11,7 +13,7 @@ impl VelocityVerletIntegrator {
 }
 
 impl Integrator for VelocityVerletIntegrator {
-    fn step(&self, bodies: &mut Vec<Body>, time_step: f64) {
+    fn step(&self, bodies: &mut [Body], time_step: f64, accelerations: &mut [DVec3]) {
         // to be implemented
     }
 }

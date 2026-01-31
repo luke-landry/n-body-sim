@@ -1,16 +1,22 @@
 use crate::integrators::Integrator;
 use crate::output::BodySnapshot;
+use glam::DVec3;
 
 pub struct Body {
     pub id: usize,
     pub mass: f64,
-    pub position: [f64; 2],
-    pub velocity: [f64; 2],
+    pub position: DVec3,
+    pub velocity: DVec3,
 }
 
 impl Body {
-    pub fn new(id: usize, mass: f64, position: [f64; 2], velocity: [f64; 2]) -> Self {
-        Body {
+    pub fn new(
+        id: usize,
+        mass: f64,
+        position: DVec3,
+        velocity: DVec3,
+    ) -> Self {
+        Self {
             id,
             mass,
             position,
@@ -75,6 +81,10 @@ impl Simulator {
         let num_results = self.bodies.len() * (self.parameters.num_steps + 1);
         let mut data: Vec<BodySnapshot> = Vec::with_capacity(num_results);
 
+        // Accelerations is allocated at sim top level so that it does not
+        // need to be heap allocated on every step
+        let mut accelerations = vec![DVec3::ZERO; self.bodies.len()];
+
         let mut record_state = |bodies: &[Body], time: f64| {
             data.extend(bodies.iter().map(|body| BodySnapshot::create(body, time)));
         };
@@ -83,7 +93,7 @@ impl Simulator {
         for _ in 0..self.parameters.num_steps {
             record_state(&self.bodies, time);
             self.integrator
-                .step(&mut self.bodies, self.parameters.time_step);
+                .step(&mut self.bodies, self.parameters.time_step, &mut accelerations);
             time += self.parameters.time_step;
         }
 

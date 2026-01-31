@@ -1,3 +1,5 @@
+use glam::DVec3;
+
 use crate::{Integrator, gravity::Gravity, simulation::Body};
 
 pub struct EulerIntegrator {
@@ -41,13 +43,12 @@ impl EulerIntegrator {
     energy from drifting away over time.
 */
 impl Integrator for EulerIntegrator {
-    fn step(&self, bodies: &mut Vec<Body>, time_step: f64) {
-        let accelerations = self.gravity.calculate_accelerations(bodies);
+    fn step(&self, bodies: &mut [Body], time_step: f64, accelerations: &mut [DVec3]) {
+        accelerations.fill(DVec3::ZERO);
+        self.gravity.calculate_accelerations(bodies, accelerations);
         for i in 0..bodies.len() {
-            for dim in 0..2 {
-                bodies[i].velocity[dim] += accelerations[i][dim] * time_step;
-                bodies[i].position[dim] += bodies[i].velocity[dim] * time_step;
-            }
+            bodies[i].velocity += accelerations[i] * time_step;
+            bodies[i].position += bodies[i].velocity * time_step;
         }
     }
 }

@@ -1,0 +1,5 @@
+{
+    "names": ["Sun", "Earth", "Moon"],
+    "radii": [0.1, 0.001, 0.0005],
+    "colors": ["yellow", "blue", "gray"]
+}

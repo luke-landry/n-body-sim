@@ -1,184 +1,350 @@
-import sys, signal
+import sys
 import pandas as pd
 import numpy as np
-from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QSlider, QLabel
+import json
+from dataclasses import dataclass, field
+from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QSlider, QLabel, QSizePolicy
 from PySide6.QtCore import Qt, QTimer
-# pyqtgraph needs to be imported after PySide6 to use it, otherwise it will try to use PyQt6
-import pyqtgraph as pg
+from vispy import scene
+from vispy.scene import visuals
+from vispy.color import Color, ColorArray, get_colormap, get_color_names
 
 
-WINDOW_TITLE = "N-body Simulation Visualizer"
+@dataclass
+class VisualizerConfig:
+    window_title: str = "N-body 3D Visualizer"
+    window_width: int = 1000
+    window_height: int = 700
+    step_rate: int = 100
+    enable_trails: bool = True
+    trail_window: int = 150
+    camera_mode: str = 'fly'  # 'fly' or 'turntable'
+    spherical: bool = True
+    default_radius: float = 0.1
+    enable_legend: bool = True
+    names: list[str] = field(default_factory=list)
+    radii: list[float] = field(default_factory=list)
+    colors: list[list[float]] = field(default_factory=list)
 
-DEFAULT_FILENAME = "data/output.csv"
+    @classmethod
+    def from_json(cls, path: str):
+        with open(path, 'r') as f:
+            data = json.load(f)
+        return cls(**data)
+    
+    def get_names(self, num_bodies) -> list[str]:
+        return [
+            self.names[i] if i < len(self.names) else f"Body {i + 1}"
+            for i in range(num_bodies)
+        ]
+    
+    def get_radii(self, num_bodies) -> np.ndarray:
+        res = np.full(num_bodies, self.default_radius, dtype=np.float32)
+        limit = min(num_bodies, len(self.radii))
+        res[:limit] = self.radii[:limit]
+        return res    
+    
+    def get_colors(self, num_bodies) -> np.ndarray:
+        colormap = get_colormap('viridis')
+        default_colors = colormap.map(np.linspace(0, 1, num_bodies))
+        if not self.colors:
+            return default_colors
+        final_colors = np.empty((num_bodies, 4), dtype=np.float32)
+        for i in range(num_bodies):
+            if i < len(self.colors) and self.colors[i]:
+                final_colors[i] = Color(self.colors[i]).rgba # type: ignore
+            else:
+                final_colors[i] = default_colors[i]
+        return ColorArray(final_colors).rgba # type: ignore
 
-# Default number of steps to show per second
-DEFAULT_STEP_RATE = 60
+        
+@dataclass
+class SimulationData:
+    positions: np.ndarray   # shape: (T, N, 3)
+    times: np.ndarray       # shape: (T,)
+    ids: np.ndarray         # shape: (N,)
 
-POINT_SIZE = 10
+    def __post_init__(self):
+        if self.positions.ndim != 3:
+            raise ValueError(f"positions must be 3D, got {self.positions.ndim}D")
+        if self.times.ndim != 1:
+            raise ValueError(f"times must be 1D, got {self.times.ndim}D")
+        if self.ids.ndim != 1:
+            raise ValueError(f"ids must be 1D, got {self.ids.ndim}D")
 
-TRAIL_WINDOW = 150
+        t_pos, n_pos, d_pos = self.positions.shape
+        t_time = self.times.shape[0]
+        n_id = self.ids.shape[0]
 
-TRAIL_ALPHA = 150
-
-INITIAL_MARGIN = 5
-
-TRAIL_Z = 1
-
-BODY_Z = 10
+        if d_pos != 3:
+            raise ValueError(f"positions last dim must be 3, got {d_pos}")
+        if t_pos != t_time:
+            raise ValueError(f"T mismatch: positions has {t_pos}, times has {t_time}")
+        if n_pos != n_id:
+            raise ValueError(f"N mismatch: positions has {n_pos}, ids has {n_id}")
+        
+        if np.isnan(self.positions).any():
+            raise ValueError("Simulation positions contain NaN values. The input data is likely corrupt.")
 
 
 class Visualizer(QWidget):
-    def __init__(self, df: pd.DataFrame, path, step_rate):
+    def __init__(self, data: SimulationData, config: VisualizerConfig):
         super().__init__()
+        self.data = data
+        self.config = config
+        self.initialize_data()
+        self.initialize_state()
+        self.initialize_ui()
+        self.initialize_visuals()
 
-        self.path = path
+    def initialize_data(self):
+        self.num_bodies = len(self.data.ids)
+        self.num_steps = len(self.data.times)
+        self.body_paths = [self.data.positions[:, i, :] for i in range(self.num_bodies)]
 
+    def initialize_state(self):
         self.step = 0
         self.playing = False
-
         self.timer = QTimer()
-        self.timer.setInterval(round(1000 / step_rate))
+        self.timer.setInterval(round(1000 / self.config.step_rate))
         self.timer.timeout.connect(self.tick)
 
-        self.initialize_data(df)
-        self.initialize_ui()
-        self.initialize_plot()
-        self.update(0)
-
-    def initialize_data(self, df: pd.DataFrame):
-        self.times = df.index.unique(level='time').to_numpy(dtype=float)
-        self.bodies = df.index.unique(level='id').to_numpy(dtype=int)
-        num_steps = len(self.times)
-        num_bodies = len(self.bodies)
-
-        # Precompute 3D numpy array [times, bodies, (x,y)]
-        self.data = np.empty((num_steps, num_bodies, 2), dtype=np.float64)
-        for body in self.bodies :
-            body_slice = df.xs(body, level='id')
-            self.data[:, body, 0] = body_slice['x'].to_numpy()
-            self.data[:, body, 1] = body_slice['y'].to_numpy()
-
-        # Compute metadata
-        initial_df = df.xs(self.times[0], level='time')
-        self.ix_min, self.ix_max = initial_df["x"].min(), initial_df["x"].max()
-        self.iy_min, self.iy_max = initial_df["y"].min(), initial_df["y"].max()
-    
     def initialize_ui(self):
-        self.setWindowTitle(WINDOW_TITLE)
+        self.setWindowTitle(self.config.window_title)
+        self.setMinimumWidth(self.config.window_width)
+        self.setMinimumHeight(self.config.window_height)
         layout = QVBoxLayout(self)
 
         header = QHBoxLayout()
-        layout.addLayout(header)
-
-        self.file_label = QLabel(f"N-body simulation data loaded from {self.path}")
-        header.addWidget(self.file_label)
-
+        header.addWidget(QLabel(f"bodies: {self.num_bodies}, steps: {self.num_steps - 1}"))
         header.addStretch()
-
         self.time_label = QLabel("t = 0.00s")
         header.addWidget(self.time_label)
+        layout.addLayout(header)
 
-        margin_x = abs(self.ix_max - self.ix_min) * INITIAL_MARGIN
-        margin_y = abs(self.iy_max - self.iy_min) * INITIAL_MARGIN
+        # canvas setup
+        self.canvas = scene.SceneCanvas(keys='interactive', show=False, bgcolor='black')
+        self.canvas.native.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        layout.addWidget(self.canvas.native)
 
-        self.plot = pg.PlotWidget()
-        self.plot.setAspectLocked(True)
-        self.plot.showGrid(x=True, y=True)
-        self.plot.setXRange(self.ix_min, self.ix_max, padding=margin_x) # type: ignore
-        self.plot.setYRange(self.iy_min, self.iy_max, padding=margin_y) # type: ignore
-        layout.addWidget(self.plot)  # type: ignore
+        # camera setup
+        self.view = self.canvas.central_widget.add_view()
+        self.view.camera = self.config.camera_mode
 
+        # grid setup
+        grid_size = 20  # Total span from -20 to 20
+        grid_step = 1   # Distance between lines
+        grid_points = []
+        for i in range(-grid_size, grid_size + 1, grid_step):
+            grid_points.extend([[-grid_size, i, 0], [grid_size, i, 0]]) # X-axis lines
+            grid_points.extend([[i, -grid_size, 0], [i, grid_size, 0]]) # Y-axis lines
+        self.grid = visuals.Line( # type: ignore
+            pos=np.array(grid_points, dtype=np.float32),
+            parent=self.view.scene,
+            connect='segments',
+            color=(0.5, 0.5, 0.5, 0.3),
+            width=1
+        )
+        self.grid.transform = scene.transforms.STTransform(scale=(1, 1), translate=(0, 0, -0.01))
+        # self.axis = visuals.XYZAxis(parent=self.view.scene) # type: ignore
+
+        # controls setup
         controls = QHBoxLayout()
-        layout.addLayout(controls)
-
         self.play_btn = QPushButton("Play")
         self.play_btn.clicked.connect(self.toggle_play)
         controls.addWidget(self.play_btn)
-
         self.slider = QSlider(Qt.Orientation.Horizontal)
-        self.slider.setMinimum(0)
-        self.slider.setMaximum(len(self.times) -1)
+        self.slider.setRange(0, self.num_steps - 1)
         self.slider.valueChanged.connect(self.slider_changed)
         controls.addWidget(self.slider)
+        layout.addLayout(controls)
 
-    def initialize_plot(self):
-        legend = self.plot.addLegend()
-        legend.setBrush(pg.mkBrush(0, 0, 0, 175))
+    def initialize_visuals(self):
+        self.body_names = self.config.get_names(self.num_bodies)
+        self.body_radii = self.config.get_radii(self.num_bodies)
+        self.body_colors = self.config.get_colors(self.num_bodies)
+        self.trail_colors = self.body_colors.copy()
+        self.trail_colors[:, 3] = 0.5
 
-        self.trails: dict[int, pg.PlotDataItem] = {}
-        self.points: dict[int, pg.ScatterPlotItem]  = {}
-        for body in self.bodies:
-            color = pg.intColor(int(body), hues=len(self.bodies))
+        # setup legend
+        if self.config.enable_legend:
+            x_offset = 20
+            y_offset = 20
+            spacing = 25
+            indices = np.arange(self.num_bodies)
+            y_positions = y_offset + (indices * spacing)
+            dot_positions = np.zeros((self.num_bodies, 2))
+            dot_positions[:, 0] = x_offset
+            dot_positions[:, 1] = y_positions
+            self.legend_dots = visuals.Markers(parent=self.canvas.scene) # type: ignore
+            self.legend_dots.set_data(
+                pos=dot_positions,
+                face_color=self.body_colors,
+                size=12,
+                edge_width=0
+            )
+            label_positions = np.zeros((self.num_bodies, 2))
+            label_positions[:, 0] = x_offset + 20
+            label_positions[:, 1] = y_positions
+            self.legend_labels = visuals.Text( # type: ignore
+                text=self.body_names,
+                parent=self.canvas.scene,
+                color='white',
+                font_size=10,
+                anchor_x='left',
+                anchor_y='center',
+                pos=label_positions
+            )
 
-            trail_color = pg.mkColor(color)
-            trail_color.setAlpha(TRAIL_ALPHA)
-            self.trails[body] = pg.PlotDataItem(pen=pg.mkPen(color=trail_color, width=1))
-            self.trails[body].setZValue(TRAIL_Z)
-            self.plot.addItem(self.trails[body])
+        # markers are the 3D points representing bodies
+        self.markers = visuals.Markers( # type: ignore
+            pos=self.data.positions[self.step],
+            scaling=True,
+            spherical=self.config.spherical,
+            parent=self.view.scene,
+            size=self.body_radii,
+            edge_width=0,
+            face_color=self.body_colors,
+        ) 
 
-            self.points[body] = pg.ScatterPlotItem(size=POINT_SIZE, brush=color, name=f"Body {body + 1}")
-            self.points[body].setZValue(BODY_Z)
-            self.plot.addItem(self.points[body])
-            
-    def update(self, step):
-        self.time_label.setText(f"t = {self.times[step]:.2f}s")
-        starting_step = max(0, step - TRAIL_WINDOW)
-        for body in self.bodies:
-            trail = self.data[starting_step : step + 1, body]
-            self.trails[body].setData(trail[:, 0], trail[:, 1])
-            self.points[body].setData([trail[-1, 0]], [trail[-1, 1]])
+        # trail lines are lines representing the entire path of the body
+        self.trail_lines = []
+        if self.config.enable_trails:
+            for i in range(self.num_bodies):
+                line = visuals.Line(parent=self.view.scene, color=self.trail_colors[i], width=2) # type: ignore
+                self.trail_lines.append(line)
 
+    def update(self):
+        self.time_label.setText(f"t = {self.data.times[self.step]:.2f}s")
+        self.markers.set_data(
+            pos=self.data.positions[self.step],
+            size=self.body_radii,
+            edge_width=0,
+            face_color=self.body_colors
+        )
+        
+        if self.config.enable_trails:
+            # only a segment of the last trail_window positions of the trail line is shown
+            start_index = max(0, self.step - self.config.trail_window)
+            for i, line in enumerate(self.trail_lines):
+                segment = self.body_paths[i][start_index : self.step + 1]
+                if len(segment) > 1:
+                    line.set_data(pos=segment)
+    
     def tick(self):
-        self.update(self.step)
+        self.step = (self.step + 1) % self.num_steps
         self.slider.blockSignals(True)
         self.slider.setValue(self.step)
         self.slider.blockSignals(False)
-        self.step = (self.step + 1) % len(self.times)
-    
+        self.update()
+
     def toggle_play(self):
         self.playing = not self.playing
         self.play_btn.setText("Pause" if self.playing else "Play")
-        if self.playing:
-            self.timer.start()
-        else:
-            self.timer.stop()
+        if self.playing: self.timer.start()
+        else: self.timer.stop()
 
     def slider_changed(self, value):
         self.step = value
-        self.update(self.step)
+        self.update()
 
-# Parse args
-path_str = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_FILENAME
-step_rate = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_STEP_RATE
+# Loads and transforms CSV simulation data into a SimulationData object
+def load_from_csv(path: str) -> SimulationData:
+    df = pd.read_csv(path)
 
-# read csv data into a dataframe
-print(f"Reading simulation data from {path_str}")
-df  = pd.DataFrame()
-try:
-    df = pd.read_csv(path_str)
-except FileNotFoundError:
-    print(f"Error: file '{path_str}' not found.")
+    # check for missing data
+    if df.isnull().values.any():
+        rows, cols = np.where(df.isnull())
+        first_row = rows[0]
+        first_col_name = df.columns[cols[0]]
+        body_id = df.iloc[first_row].get('id', 'Unknown').astype(int)
+        time_val = df.iloc[first_row].get('time', 'Unknown')
+        raise ValueError(
+            f"Missing value detected at CSV line {first_row + 2} " # +2 for header offset
+            f"(Column: '{first_col_name}', Time: {time_val}, ID: {body_id})."
+        )
+
+    df.set_index(["time", "id"], inplace=True)
+    df.sort_index(inplace=True)
+    
+    times = (df.index
+             .get_level_values("time")
+             .unique()
+             .to_numpy()
+             .astype(np.float32)
+    )
+    
+    ids = (df.index
+           .get_level_values("id")
+           .unique()
+           .to_numpy()
+           .astype(np.uint32)
+    )
+
+    # converts the time-series per-body xyz data into
+    # a 3D array (tensor) of dimension (T, N, 3)
+    positions = (
+        df[["x", "y", "z"]]
+        .to_numpy()
+        .reshape(len(times), len(ids), 3)
+        .astype(np.float32)
+    )
+
+    return SimulationData(positions, times, ids)
+
+def load_from_bin(path: str) -> SimulationData:
+    # todo
+    return SimulationData(np.empty(0), np.empty(0), np.empty(0))
+
+def exit_with_error(message):
+    print(message)
+    input("\nPress Enter to close...")
     sys.exit(1)
-df.set_index(['time', 'id'], inplace=True)
-df.sort_index(inplace=True)
 
-# parse step rate
-try:
-    step_rate = int(step_rate)
-except ValueError:
-    print(f"Error: invalid step rate {step_rate}")
-    sys.exit(1)
+if __name__ == '__main__':
+    DEFAULT_DATA_PATH = "data/output.csv"
 
-# launch visualizer qt app
-print("Launching visualization window")
-app = QApplication()
-visualizer = Visualizer(df, path_str, step_rate)
-visualizer.show()
+    # read simulation data file
+    data_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_DATA_PATH
+    data_file_type = data_path.split(".")[-1].lower()
 
-# this allows ctrl+c to work while the window is launched
-signal.signal(signal.SIGINT, signal.SIG_DFL)
+    if data_file_type == "csv":
+        try:
+            data = load_from_csv(data_path)
+        except Exception as e:
+            exit_with_error(f"Error: failed to load CSV data at {data_path}:\n{e}")
+    elif data_file_type == "nbody":
+        exit_with_error("Binary input format (.nbody) not supported yet")
+        # try:
+        #     data = load_from_bin(data_path)
+        # except Exception as e:
+        #     exit_with_error(f"Error: failed to load binary data at {data_path}:\n{e}")
+    else:
+        exit_with_error(f"Error: Unsupported data file type: .{data_file_type}\n"
+                        "Simulation data must be in .csv or .nbody format.")
 
-print("Visualization launched, press play in the bottom left of the window to start")
-print("To return to this terminal, close the simulation window or press Ctrl+C here")
+    # read visualization configuration file
+    config_path = sys.argv[2] if len(sys.argv) > 2 else None
+    
+    if config_path:
+        config_file_type = config_path.split(".")[-1].lower()
+        if config_file_type == "json":
+            try:
+                config = VisualizerConfig.from_json(config_path)
+            except Exception as e:
+                exit_with_error(f"Error: failed to load JSON config at {config_path}:\n{e}")
+        else:
+            exit_with_error(f"Error: Unsupported config file type: .{config_file_type}\n"
+                            "Configuration must be in .json format.")
+    else:
+        config = VisualizerConfig()
 
-sys.exit(app.exec())
+    try:
+        app = QApplication(sys.argv)
+        visualizer = Visualizer(data, config)
+        visualizer.show()
+        sys.exit(app.exec())
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        exit_with_error("\nError: visualization failed")

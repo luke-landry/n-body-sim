@@ -10,6 +10,7 @@ pub struct BodySnapshot {
     id: usize,
     x: f64,
     y: f64,
+    z: f64,
 }
 
 impl BodySnapshot {
@@ -17,8 +18,9 @@ impl BodySnapshot {
         BodySnapshot {
             time,
             id: body.id,
-            x: body.position[0],
-            y: body.position[1],
+            x: body.position.x,
+            y: body.position.y,
+            z: body.position.z,
         }
     }
 }
