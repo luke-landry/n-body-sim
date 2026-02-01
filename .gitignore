@@ -1,3 +1,7 @@
-target/
 .venv/
-data/output.csv
+.vscode/
+target/
+data/*
+!data/examples/
+scripts/__pycache__/
+n-body-sim*

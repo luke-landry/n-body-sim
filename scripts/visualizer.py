@@ -1,91 +1,11 @@
-import sys
-import pandas as pd
 import numpy as np
-import json
-from dataclasses import dataclass, field
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QSlider, QLabel, QSizePolicy
 from PySide6.QtCore import Qt, QTimer
 from vispy import scene
 from vispy.scene import visuals
-from vispy.color import Color, ColorArray, get_colormap, get_color_names
+from vispy.color import Color, ColorArray, get_colormap
 
-
-@dataclass
-class VisualizerConfig:
-    window_title: str = "N-body 3D Visualizer"
-    window_width: int = 1000
-    window_height: int = 700
-    step_rate: int = 100
-    enable_trails: bool = True
-    trail_window: int = 150
-    camera_mode: str = 'fly'  # 'fly' or 'turntable'
-    spherical: bool = True
-    default_radius: float = 0.1
-    enable_legend: bool = True
-    names: list[str] = field(default_factory=list)
-    radii: list[float] = field(default_factory=list)
-    colors: list[list[float]] = field(default_factory=list)
-
-    @classmethod
-    def from_json(cls, path: str):
-        with open(path, 'r') as f:
-            data = json.load(f)
-        return cls(**data)
-    
-    def get_names(self, num_bodies) -> list[str]:
-        return [
-            self.names[i] if i < len(self.names) else f"Body {i + 1}"
-            for i in range(num_bodies)
-        ]
-    
-    def get_radii(self, num_bodies) -> np.ndarray:
-        res = np.full(num_bodies, self.default_radius, dtype=np.float32)
-        limit = min(num_bodies, len(self.radii))
-        res[:limit] = self.radii[:limit]
-        return res    
-    
-    def get_colors(self, num_bodies) -> np.ndarray:
-        colormap = get_colormap('viridis')
-        default_colors = colormap.map(np.linspace(0, 1, num_bodies))
-        if not self.colors:
-            return default_colors
-        final_colors = np.empty((num_bodies, 4), dtype=np.float32)
-        for i in range(num_bodies):
-            if i < len(self.colors) and self.colors[i]:
-                final_colors[i] = Color(self.colors[i]).rgba # type: ignore
-            else:
-                final_colors[i] = default_colors[i]
-        return ColorArray(final_colors).rgba # type: ignore
-
-        
-@dataclass
-class SimulationData:
-    positions: np.ndarray   # shape: (T, N, 3)
-    times: np.ndarray       # shape: (T,)
-    ids: np.ndarray         # shape: (N,)
-
-    def __post_init__(self):
-        if self.positions.ndim != 3:
-            raise ValueError(f"positions must be 3D, got {self.positions.ndim}D")
-        if self.times.ndim != 1:
-            raise ValueError(f"times must be 1D, got {self.times.ndim}D")
-        if self.ids.ndim != 1:
-            raise ValueError(f"ids must be 1D, got {self.ids.ndim}D")
-
-        t_pos, n_pos, d_pos = self.positions.shape
-        t_time = self.times.shape[0]
-        n_id = self.ids.shape[0]
-
-        if d_pos != 3:
-            raise ValueError(f"positions last dim must be 3, got {d_pos}")
-        if t_pos != t_time:
-            raise ValueError(f"T mismatch: positions has {t_pos}, times has {t_time}")
-        if n_pos != n_id:
-            raise ValueError(f"N mismatch: positions has {n_pos}, ids has {n_id}")
-        
-        if np.isnan(self.positions).any():
-            raise ValueError("Simulation positions contain NaN values. The input data is likely corrupt.")
-
+from data import SimulationData, VisualizerConfig
 
 class Visualizer(QWidget):
     def __init__(self, data: SimulationData, config: VisualizerConfig):
@@ -160,9 +80,9 @@ class Visualizer(QWidget):
         layout.addLayout(controls)
 
     def initialize_visuals(self):
-        self.body_names = self.config.get_names(self.num_bodies)
-        self.body_radii = self.config.get_radii(self.num_bodies)
-        self.body_colors = self.config.get_colors(self.num_bodies)
+        self.body_names = self.generate_names()
+        self.body_radii = self.generate_radii()
+        self.body_colors = self.generate_colors()
         self.trail_colors = self.body_colors.copy()
         self.trail_colors[:, 3] = 0.5
 
@@ -248,84 +168,66 @@ class Visualizer(QWidget):
         self.step = value
         self.update()
 
-# Loads and transforms CSV simulation data into a SimulationData object
-def load_from_csv(path: str) -> SimulationData:
-    df = pd.read_csv(path)
-
-    # check for missing data
-    if df.isnull().values.any():
-        rows, cols = np.where(df.isnull())
-        first_row = rows[0]
-        first_col_name = df.columns[cols[0]]
-        body_id = df.iloc[first_row].get('id', 'Unknown').astype(int)
-        time_val = df.iloc[first_row].get('time', 'Unknown')
-        raise ValueError(
-            f"Missing value detected at CSV line {first_row + 2} " # +2 for header offset
-            f"(Column: '{first_col_name}', Time: {time_val}, ID: {body_id})."
-        )
-
-    df.set_index(["time", "id"], inplace=True)
-    df.sort_index(inplace=True)
+    def generate_names(self) -> list[str]:
+        return [
+            self.config.names[i] if i < len(self.config.names) else f"Body {i + 1}"
+            for i in range(self.num_bodies)
+        ]
     
-    times = (df.index
-             .get_level_values("time")
-             .unique()
-             .to_numpy()
-             .astype(np.float32)
-    )
+    def generate_radii(self) -> np.ndarray:
+        res = np.full(self.num_bodies, self.config.default_radius, dtype=np.float32)
+        limit = min(self.num_bodies, len(self.config.radii))
+        res[:limit] = self.config.radii[:limit]
+        return res    
     
-    ids = (df.index
-           .get_level_values("id")
-           .unique()
-           .to_numpy()
-           .astype(np.uint32)
-    )
+    def generate_colors(self) -> np.ndarray:
+        colormap = get_colormap('viridis')
+        default_colors = colormap.map(np.linspace(0, 1, self.num_bodies))
+        if not self.config.colors:
+            return default_colors
+        final_colors = np.empty((self.num_bodies, 4), dtype=np.float32)
+        for i in range(self.num_bodies):
+            if i < len(self.config.colors) and self.config.colors[i]:
+                final_colors[i] = Color(self.config.colors[i]).rgba # type: ignore
+            else:
+                final_colors[i] = default_colors[i]
+        return ColorArray(final_colors).rgba # type: ignore
 
-    # converts the time-series per-body xyz data into
-    # a 3D array (tensor) of dimension (T, N, 3)
-    positions = (
-        df[["x", "y", "z"]]
-        .to_numpy()
-        .reshape(len(times), len(ids), 3)
-        .astype(np.float32)
-    )
+# visualizer.py can be run standalone as a script
+if __name__ == "__main__":
+    import sys
+    from data import load_sim_data_from_csv, load_sim_data_from_bin
 
-    return SimulationData(positions, times, ids)
+    def exit_with_error(message):
+        print(message)
+        input("\nPress Enter to close...")
+        sys.exit(1)
 
-def load_from_bin(path: str) -> SimulationData:
-    # todo
-    return SimulationData(np.empty(0), np.empty(0), np.empty(0))
+    if len(sys.argv) < 2:
+         exit_with_error("Visualizer script needs at least one arg:\n"
+                         "\tpath/to/data (.csv/.nbody)"
+                         "\toptional: path/to/config (.json) ")
 
-def exit_with_error(message):
-    print(message)
-    input("\nPress Enter to close...")
-    sys.exit(1)
-
-if __name__ == '__main__':
-    DEFAULT_DATA_PATH = "data/output.csv"
-
-    # read simulation data file
-    data_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_DATA_PATH
+    data_path = sys.argv[1]
     data_file_type = data_path.split(".")[-1].lower()
 
     if data_file_type == "csv":
         try:
-            data = load_from_csv(data_path)
+            data = load_sim_data_from_csv(data_path)
         except Exception as e:
             exit_with_error(f"Error: failed to load CSV data at {data_path}:\n{e}")
     elif data_file_type == "nbody":
         exit_with_error("Binary input format (.nbody) not supported yet")
         # try:
-        #     data = load_from_bin(data_path)
+        #     data = load_sim_data_from_bin(data_path)
         # except Exception as e:
         #     exit_with_error(f"Error: failed to load binary data at {data_path}:\n{e}")
     else:
         exit_with_error(f"Error: Unsupported data file type: .{data_file_type}\n"
                         "Simulation data must be in .csv or .nbody format.")
 
-    # read visualization configuration file
-    config_path = sys.argv[2] if len(sys.argv) > 2 else None
-    
+    config_path = sys.argv[2] if len(sys.argv) > 2 else ""
+
     if config_path:
         config_file_type = config_path.split(".")[-1].lower()
         if config_file_type == "json":

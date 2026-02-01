@@ -1,5 +1,13 @@
 {
-    "names": ["Sun", "Earth", "Moon"],
-    "radii": [0.1, 0.001, 0.0005],
-    "colors": ["yellow", "blue", "gray"]
+    "simulationParams": {
+        "g_constant": 1.0,
+        "time_step": 0.001,
+        "softening_factor": 0.0
+
+    },
+    "visualizerConfig": {
+        "names": ["Sun", "Earth", "Moon"],
+        "radii": [0.1, 0.001, 0.0005],
+        "colors": ["yellow", "blue", "gray"]
+    }
 }

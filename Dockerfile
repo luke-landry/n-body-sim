@@ -5,8 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     # apt packages needed for development
-    git sudo \
-    # cleanup
+    git sudo mingw-w64 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -24,4 +23,5 @@ WORKDIR /home/$USERNAME/n-body-sim
 
 USER $USERNAME
 
-RUN rustup component add clippy rustfmt
+RUN rustup target add x86_64-pc-windows-gnu \
+    && rustup component add clippy rustfmt

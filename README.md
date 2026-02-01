@@ -4,21 +4,49 @@ A simulator for how multiple objects in space (bodies) move and interact with ea
 ![cover](images/cover.png)
 
 ## Overview
-This project implements an N-body simulator that models the gravitational interactions between bodies in 3D using numerical integration methods. The physics engine is written in Rust, and the configuration and visualization GUI is implemented in Python using the Qt framework and VisPy.
+This project implements an N-body simulator that models the gravitational interactions between bodies in 3D using numerical integration methods. The physics engine is written in Rust, and the configuration and visualization GUIs are implemented in Python using the Qt framework and VisPy.
 
-## Quick Start (GUI)
+## Quick Start
 ### Prerequisites
 - Python installed
 
 ### Windows
-1. Download and extract the Windows release zip
+1. Download and extract the latest Windows release zip
 2. Run `install.bat` to setup the  virtual environment and install required packages (first time only)
-3. Run `run.bat` to launch the application
+3. Run `run.bat` to start the application
 
 ### Linux/macOS
-1. Download and extract the Linux release tarball
+1. Download and extract the latest Linux release tarball
 2. Run `install.sh` to setup the virtual environment and install required packages (first time only)
 3. Run `run.sh` to launch the application
+
+## GUI Usage
+
+### Launcher
+The launcher allows you to configure simulation parameters and body initial conditions:
+- **Parameter Configuration**: Set the gravitational constant (G), time step, number of steps, and softening factor
+- **Body Table**: Add, remove, and edit body properties (name, color, mass, position, velocity, radius)
+- **Load/Save**: Load existing configurations or save your current setup
+- **Launch Simulation**: Start the physics simulation with your configured parameters
+
+### Visualizer
+
+#### **Camera Navigation**
+The visualizer supports two camera modes:
+
+**Fly Mode** (free-flying camera):
+- **Look**: Left-click and drag to look around
+- **Movement**: Use WASD to move around, Q and E to roll, and F and C to move up and down
+- **Zoom**: Scroll wheel to zoom in/out
+
+**Turntable Mode** (orbit around center):
+- **Rotate**: Left-click and drag to orbit around the center
+- **Translate**: Shift-left-click and drag to translate the camera
+- **Zoom**: Scroll wheel to zoom in/out
+
+#### **Playback Controls**
+- **Play/Pause**: Click the "Play" button to start/stop the simulation playback
+- **Timeline**: Click and drag on the slider or click at any point to jump to a specific time step in the simulation
 
 ## CLI Usage
 The Rust physics engine can also be run independently without installing Python or using the GUI tools.
@@ -39,12 +67,12 @@ The Rust physics engine can also be run independently without installing Python 
 
 **Windows:**
 ```
-.\n-body-sim.exe -i data/initial-conditions-examples/ic-figure-eight.csv -o data/output.csv --time-step 0.01 --num-steps 10000 --integrator euler
+.\n-body-sim.exe -i data/examples/figure-eight.csv -o data/output.csv --time-step 0.01 --num-steps 10000 --integrator euler
 ```
 
 **Linux/macOS:**
 ```
-./n-body-sim -i data/initial-conditions-examples/ic-figure-eight.csv -o data/output.csv --time-step 0.01 --num-steps 10000 --integrator euler
+./n-body-sim -i data/examples/figure-eight.csv -o data/output.csv --time-step 0.01 --num-steps 10000 --integrator euler
 ```
 
 ## Data Formats
@@ -141,9 +169,11 @@ These algorithms calculate the gravitational forces exerted on each body.
 
 #### **Softening Factor**
 Gravitational force is calculated using Newton's Law of Universal Gravitation:
+
 $$
 F=G\frac{m_1m_2}{r^2}
 $$
+
 To prevent numerical singularities when two bodies pass very close to each other, this simulator uses a softening factor ($\epsilon$). When the distance ($r$) between bodies approaches zero, the ($1/r^2$) term approaches infinity, so this factor is added to the distance in the gravity force calculation to ensure it remains finite:
 
 $$
@@ -161,6 +191,10 @@ A larger $\epsilon$ increases numerical stability by smoothing out interactions,
 
 ### Manually with Docker installed
 1. Build the development image with `docker build -t n-body-sim .`
-2. Run the development container with `docker run -dit -v $(pwd):/home/dev/n-body-sim --name n-body-sim n-body-sim`
+2. Run the development container with 
+    - Linux (bash): `docker run -dit -v $(pwd):/home/dev/n-body-sim --name n-body-sim n-body-sim`
+    - Windows (PS): `docker run -dit -v ${PWD}:/home/dev/n-body-sim --name n-body-sim n-body-sim`
 3. Enter the container with `docker exec -it n-body-sim bash`
-4. In the container, run `cargo build`
+4. In the container, build the binary for Linux or .exe for Windows by running
+    - Linux: `cargo build`
+    - Windows: `cargo build --target x86_64-pc-windows-gnu`
