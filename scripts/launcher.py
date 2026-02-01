@@ -1,22 +1,17 @@
-import csv, json
-import pandas as pd
-import subprocess
-import sys, os
+import sys, subprocess
 from pathlib import Path
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, QFileDialog, QLineEdit, QLabel, 
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, QFileDialog,
     QDoubleSpinBox, QSpinBox, QFormLayout, QHeaderView, QTextEdit)
 from PySide6.QtCore import Qt, Signal, QAbstractTableModel, QModelIndex
+from data import BodyConfig, SimulationParameters, VisualizerConfig, save_scenario, load_scenario
 
-# model for body configurations in the launcher table view
+# table model for body configurations in the launcher's table view
 class BodyTableModel(QAbstractTableModel):
-    def __init__(self, bodies=None):
+    def __init__(self, bodies: list[BodyConfig] | None = None):
         super().__init__()
-        self.bodies = bodies or [
-            {"name": "Sun", "mass": 1000.0, "radius": 0.5, "color": "yellow", 
-             "pos_x": 0.0, "pos_y": 0.0, "pos_z": 0.0, "vel_x": 0.0, "vel_y": 0.0, "vel_z": 0.0}
-        ]
-        self.headers = ["Name", "Color", "Radius", "Mass", "Pos X", "Pos Y", "Pos Z", "Vel X", "Vel Y", "Vel Z"]
-        self.keys = ["name", "color", "radius", "mass", "pos_x", "pos_y", "pos_z", "vel_x", "vel_y", "vel_z"]
+        self.bodies = bodies or [BodyConfig.default(1)]
+        self.keys = list(BodyConfig.model_fields.keys())
+        self.headers = [k.replace('_', ' ').title() for k in self.keys]
 
     def rowCount(self, parent=QModelIndex()):
         return len(self.bodies)
@@ -31,28 +26,32 @@ class BodyTableModel(QAbstractTableModel):
         body = self.bodies[index.row()]
         key = self.keys[index.column()]
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
-            return body[key]
+            return getattr(body, key)
         return None
 
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
-        if index.isValid() and role == Qt.ItemDataRole.EditRole:
-            key = self.keys[index.column()]
-            try:
-                if key not in ["name", "color"]:
-                    value = float(value)
-                self.bodies[index.row()][key] = value
-                self.dataChanged.emit(index, index)
-                return True
-            except ValueError:
-                return False
-        return False
+        if not index.isValid():
+            return False
+        if role != Qt.ItemDataRole.EditRole:
+            return False
+        
+        key = self.keys[index.column()]
+        try:
+            if key not in ["name", "color"]:
+                value = float(value)
+            setattr(self.bodies[index.row()], key, value)
+            self.dataChanged.emit(index, index)
+            return True
+        except ValueError:
+            return False
 
     def headerData(self, section, orientation, role):
-        if role == Qt.ItemDataRole.DisplayRole:
-            if orientation == Qt.Orientation.Horizontal:
-                return self.headers[section]
-            if orientation == Qt.Orientation.Vertical:
-                return str(section + 1)
+        if role != Qt.ItemDataRole.DisplayRole:
+            return None
+        if orientation == Qt.Orientation.Horizontal:
+            return self.headers[section]
+        if orientation == Qt.Orientation.Vertical:
+            return str(section + 1)
         return None
 
     def flags(self, index):
@@ -60,7 +59,7 @@ class BodyTableModel(QAbstractTableModel):
 
     def add_body(self):
         self.beginInsertRows(QModelIndex(), self.rowCount(), self.rowCount())
-        self.bodies.append({k: (0.0 if k not in ["name", "color"] else "") for k in self.keys})
+        self.bodies.append(BodyConfig.default(len(self.bodies) + 1))
         self.endInsertRows()
 
     def remove_body(self, row):
@@ -131,7 +130,7 @@ class Launcher(QWidget):
         self.status_box = QTextEdit()
         self.status_box.setReadOnly(True)
         self.status_box.setMaximumHeight(100)
-        self.status_box.setLineWrapMode(QTextEdit.NoWrap)
+        self.status_box.setLineWrapMode(QTextEdit.NoWrap) # type: ignore
         params_group.addWidget(self.status_box, 3)
         
         layout.addLayout(params_group)
@@ -140,7 +139,7 @@ class Launcher(QWidget):
         self.model = BodyTableModel()
         self.table_view = QTableView()
         self.table_view.setModel(self.model)
-        self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch) # type: ignore
         layout.addWidget(self.table_view)
 
         # Button controls layout
@@ -180,51 +179,28 @@ class Launcher(QWidget):
         self.status_box.append(f"[ERROR] {message}")
 
     def handle_save(self):
+        sim_params = SimulationParameters(
+            g_constant=self.g_input.value(),
+            time_step=self.dt_input.value(),
+            num_steps=self.steps_input.value(),
+            softening_factor=self.softening_input.value()
+        )
+        visualizer_config = VisualizerConfig()
+
         path_str, _ = QFileDialog.getSaveFileName(
             self,
             "Save Initial Conditions",
             "",
             "CSV Files (*.csv)"
         )
-
         if path_str:
             csv_path = Path(path_str)
             json_path = csv_path.with_suffix(".json")
             try:
-                self.save_simulation_files(self.model.bodies, csv_path, json_path)
+                save_scenario(sim_params, visualizer_config, self.model.bodies, csv_path, json_path)
                 self.print_status_info(f"Successfully saved:\n{csv_path}\n{json_path}")
             except Exception as e:
                 self.sim_error.emit(f"Save failed: {str(e)}")
-
-    def save_simulation_files(self, bodies, ic_csv_path: Path, json_path: Path):
-        csv_keys = ["mass", "pos_x", "pos_y", "pos_z", "vel_x", "vel_y", "vel_z"]
-        config = {
-            "simulationParams": {
-                "g_constant": self.g_input.value(),
-                "time_step": self.dt_input.value(),
-                "num_steps": self.steps_input.value(),
-                "softening_factor": self.softening_input.value()
-            },
-            "visualizerConfig": {
-                "names": [],
-                "radii": [],
-                "colors": []
-            }
-        }
-
-        # write initial conditions csv
-        with open(ic_csv_path, 'w', newline='') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=csv_keys, extrasaction='ignore')
-            writer.writeheader()
-            for body in bodies:
-                writer.writerow(body)
-                config["visualizerConfig"]["names"].append(body["name"])
-                config["visualizerConfig"]["radii"].append(body["radius"])
-                config["visualizerConfig"]["colors"].append(body["color"])
-
-        # write json
-        with open(json_path, 'w') as jsonfile:
-            json.dump(config, jsonfile, indent=4)
 
     def handle_load(self):
         path_str, _ = QFileDialog.getOpenFileName(
@@ -237,65 +213,30 @@ class Launcher(QWidget):
         if path_str:
             csv_path = Path(path_str)
             json_path = csv_path.with_suffix(".json")
+
+            # json configuration is optional
+            if not json_path.exists():
+                json_path = None
             
             try:
-                new_bodies = self.load_simulation_files(csv_path, json_path)
+                sim_params, visualizer_config, new_bodies = load_scenario(csv_path, json_path)
                 self.model.beginResetModel()
                 self.model.bodies = new_bodies
                 self.model.endResetModel()
+                
+                # Update simulation parameters if they exist
+                if sim_params:
+                    self.g_input.setValue(sim_params.g_constant)
+                    self.dt_input.setValue(sim_params.time_step)
+                    self.steps_input.setValue(sim_params.num_steps)
+                    self.softening_input.setValue(sim_params.softening_factor)
+
+                #TODO add visualizer options here
+                
                 self.print_status_info(f"Successfully loaded: {csv_path}")
             except Exception as e:
-                self.sim_error.emit(f"Load failed: {str(e)}")
+                self.print_status_error(f"Load failed: {str(e)}")
 
-    def load_simulation_files(self, ic_csv_path: Path, json_path: Path):
-
-        # read initial conditions csv
-        df = pd.read_csv(ic_csv_path)
-        numeric_keys = ["mass", "pos_x", "pos_y", "pos_z", "vel_x", "vel_y", "vel_z"]
-        df = df.reindex(columns=numeric_keys).fillna(0.0)
-
-        missing_cols = [col for col in numeric_keys if col not in df.columns]
-        if missing_cols:
-            raise ValueError(f"CSV is missing required columns: {', '.join(missing_cols)}")
-        if df[numeric_keys].isnull().values.any():
-            raise ValueError("CSV contains empty or malformed numeric cells.")
-
-        # read config json
-        config = {}
-        if json_path.exists():
-            with open(json_path, 'r') as f:
-                config = json.load(f)
-        elif str(json_path):
-            self.print_status_warn(f"No configuration file found at {json_path}")
-        
-        # combine initial confitions and configs back into a
-        # list of dictionaries for the table data model
-        bodies = []
-        num_rows = len(df)
-        visualizer_config = config.get("visualizerConfig", config) if isinstance(config, dict) else {}
-        simulation_params = config.get("simulationParams", {}) if isinstance(config, dict) else {}
-
-        if isinstance(simulation_params, dict):
-            if "g_constant" in simulation_params:
-                self.g_input.setValue(simulation_params["g_constant"])
-            if "time_step" in simulation_params:
-                self.dt_input.setValue(simulation_params["time_step"])
-            if "num_steps" in simulation_params:
-                self.steps_input.setValue(int(simulation_params["num_steps"]))
-            if "softening_factor" in simulation_params:
-                self.softening_input.setValue(simulation_params["softening_factor"])
-
-        names = visualizer_config.get("names", []) if isinstance(visualizer_config, dict) else []
-        radii = visualizer_config.get("radii", []) if isinstance(visualizer_config, dict) else []
-        colors = visualizer_config.get("colors", []) if isinstance(visualizer_config, dict) else []
-
-        for i, row_dict in enumerate(df.to_dict('records')):
-            row_dict["name"] = names[i] if i < len(names) else f"Body {i+1}"
-            row_dict["radius"] = radii[i] if i < len(radii) else 0.1
-            row_dict["color"] = colors[i] if i < len(colors) else "#ffffff"
-            bodies.append(row_dict)
-        
-        return bodies
 
     def launch_sim(self):
         self.print_status_info("Preparing simulation...")
@@ -317,7 +258,14 @@ class Launcher(QWidget):
             return
         
         try:
-            self.save_simulation_files(self.model.bodies, IC_PATH, CONFIG_PATH)
+            sim_params = SimulationParameters(
+                g_constant=self.g_input.value(),
+                time_step=self.dt_input.value(),
+                num_steps=self.steps_input.value(),
+                softening_factor=self.softening_input.value()
+            )
+            visualizer_config = VisualizerConfig()
+            save_scenario(sim_params, visualizer_config, self.model.bodies, IC_PATH, CONFIG_PATH)
             
             command = [
                 str(BIN_PATH),
@@ -338,6 +286,3 @@ class Launcher(QWidget):
             self.sim_error.emit(f"Physics Engine Error:\n{e.stderr}")
         except Exception as e:
             self.sim_error.emit(f"Error:\n{str(e)}")
-
-        
-

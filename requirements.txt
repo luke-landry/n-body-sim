@@ -1,4 +1,5 @@
 pandas
 numpy
+pydantic
 PySide6
 vispy

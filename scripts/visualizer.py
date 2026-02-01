@@ -1,11 +1,13 @@
 import numpy as np
+from pathlib import Path
+from typing import Self
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QSlider, QLabel, QSizePolicy
 from PySide6.QtCore import Qt, QTimer
 from vispy import scene
 from vispy.scene import visuals
 from vispy.color import Color, ColorArray, get_colormap
-
 from data import SimulationData, VisualizerConfig
+
 
 class Visualizer(QWidget):
     def __init__(self, data: SimulationData, config: VisualizerConfig):
@@ -192,61 +194,43 @@ class Visualizer(QWidget):
             else:
                 final_colors[i] = default_colors[i]
         return ColorArray(final_colors).rgba # type: ignore
+    
+    @classmethod
+    def from_paths(cls, data_path: Path, config_path: Path | None) -> Self:
+        if not data_path.exists():
+            raise FileNotFoundError(f"The simulation data file {data_path} does not exist")
+        if config_path and not config_path.exists():
+            raise FileNotFoundError(f"The config data file {config_path} does not exist")
+        
+        if data_path.suffix == ".csv":
+            data = SimulationData.from_csv(data_path)
+        elif data_path.suffix == ".nbody":
+            data = SimulationData.from_bin(data_path)
+        else:
+            raise ValueError(f"Unsupported file format for simulation data: {data_path.suffix}")
+        
+        if config_path and not config_path.suffix == ".json":
+            raise ValueError(f"Unsupported file format for config data: {config_path.suffix}")
+        config = VisualizerConfig.from_json(config_path) if config_path else VisualizerConfig()
 
+        return cls(data, config)
+        
 # visualizer.py can be run standalone as a script
 if __name__ == "__main__":
     import sys
-    from data import load_sim_data_from_csv, load_sim_data_from_bin
-
-    def exit_with_error(message):
-        print(message)
-        input("\nPress Enter to close...")
-        sys.exit(1)
 
     if len(sys.argv) < 2:
-         exit_with_error("Visualizer script needs at least one arg:\n"
+         print("Visualizer script needs at least one arg:\n"
                          "\tpath/to/data (.csv/.nbody)"
                          "\toptional: path/to/config (.json) ")
 
-    data_path = sys.argv[1]
-    data_file_type = data_path.split(".")[-1].lower()
-
-    if data_file_type == "csv":
-        try:
-            data = load_sim_data_from_csv(data_path)
-        except Exception as e:
-            exit_with_error(f"Error: failed to load CSV data at {data_path}:\n{e}")
-    elif data_file_type == "nbody":
-        exit_with_error("Binary input format (.nbody) not supported yet")
-        # try:
-        #     data = load_sim_data_from_bin(data_path)
-        # except Exception as e:
-        #     exit_with_error(f"Error: failed to load binary data at {data_path}:\n{e}")
-    else:
-        exit_with_error(f"Error: Unsupported data file type: .{data_file_type}\n"
-                        "Simulation data must be in .csv or .nbody format.")
-
-    config_path = sys.argv[2] if len(sys.argv) > 2 else ""
-
-    if config_path:
-        config_file_type = config_path.split(".")[-1].lower()
-        if config_file_type == "json":
-            try:
-                config = VisualizerConfig.from_json(config_path)
-            except Exception as e:
-                exit_with_error(f"Error: failed to load JSON config at {config_path}:\n{e}")
-        else:
-            exit_with_error(f"Error: Unsupported config file type: .{config_file_type}\n"
-                            "Configuration must be in .json format.")
-    else:
-        config = VisualizerConfig()
+    data_path = Path(sys.argv[1])
+    config_path = Path(sys.argv[2]) if len(sys.argv) > 2 else None
 
     try:
         app = QApplication(sys.argv)
-        visualizer = Visualizer(data, config)
+        visualizer = Visualizer.from_paths(data_path, config_path)
         visualizer.show()
         sys.exit(app.exec())
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        exit_with_error("\nError: visualization failed")
+        print(f"\nError: visualization failed: {e}")

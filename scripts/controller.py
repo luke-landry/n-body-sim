@@ -1,8 +1,7 @@
 
 from PySide6.QtWidgets import QApplication, QMessageBox
-import os
+from pathlib import Path
 from launcher import Launcher
-from data import VisualizerConfig, load_sim_data_from_csv, load_sim_data_from_bin
 from visualizer import Visualizer
 
 class Controller:
@@ -12,28 +11,17 @@ class Controller:
         self.launcher.sim_complete.connect(self.on_sim_complete)
         self.launcher.sim_error.connect(self.on_sim_error)
 
-    def on_sim_complete(self, data_path, config_path):
+    def on_sim_complete(self, data_path_str: str, config_path_str: str | None):
         try:
-            data_ext = data_path.split(".")[-1].lower()
-            if data_ext == "csv":
-                data = load_sim_data_from_csv(data_path)
-            elif data_ext == "nbody":
-                data = load_sim_data_from_bin(data_path) 
-            else:
-                raise ValueError(f"Unsupported data format: .{data_ext}")
-
-            if config_path and os.path.exists(config_path):
-                config = VisualizerConfig.from_json(config_path)
-            else:
-                config = VisualizerConfig()
-
-            self.visualizer = Visualizer(data, config)
+            data_path = Path(data_path_str)
+            config_path = Path(config_path_str) if config_path_str else None
+            self.visualizer = Visualizer.from_paths(data_path, config_path)
             self.visualizer.show()
         except Exception as e:
-            self.show_error_dialog(f"Error during visualization:\n{str(e)}")
+            self.show_error_dialog(f"Error during visualization:\n{e}")
 
     def on_sim_error(self, error_message):
-        print(f"ERROR: {error_message}")
+        print(f"Error during sim: {error_message}")
         self.show_error_dialog(error_message)
         
     def show_error_dialog(self, error_message):
