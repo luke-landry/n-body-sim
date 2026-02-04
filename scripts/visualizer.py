@@ -7,6 +7,7 @@ from vispy import scene
 from vispy.scene import visuals
 from vispy.color import Color, ColorArray, get_colormap
 from data import SimulationData, VisualizerConfig
+import storage
 
 
 class Visualizer(QWidget):
@@ -194,26 +195,6 @@ class Visualizer(QWidget):
             else:
                 final_colors[i] = default_colors[i]
         return ColorArray(final_colors).rgba # type: ignore
-    
-    @classmethod
-    def from_paths(cls, data_path: Path, config_path: Path | None) -> Self:
-        if not data_path.exists():
-            raise FileNotFoundError(f"The simulation data file {data_path} does not exist")
-        if config_path and not config_path.exists():
-            raise FileNotFoundError(f"The config data file {config_path} does not exist")
-        
-        if data_path.suffix == ".csv":
-            data = SimulationData.from_csv(data_path)
-        elif data_path.suffix == ".nbody":
-            data = SimulationData.from_bin(data_path)
-        else:
-            raise ValueError(f"Unsupported file format for simulation data: {data_path.suffix}")
-        
-        if config_path and not config_path.suffix == ".json":
-            raise ValueError(f"Unsupported file format for config data: {config_path.suffix}")
-        config = VisualizerConfig.from_json(config_path) if config_path else VisualizerConfig()
-
-        return cls(data, config)
         
 # visualizer.py can be run standalone as a script
 if __name__ == "__main__":
@@ -229,7 +210,7 @@ if __name__ == "__main__":
 
     try:
         app = QApplication(sys.argv)
-        visualizer = Visualizer.from_paths(data_path, config_path)
+        visualizer = storage.create_visualizer_from_paths(data_path, config_path)
         visualizer.show()
         sys.exit(app.exec())
     except Exception as e:

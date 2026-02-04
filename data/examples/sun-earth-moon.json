@@ -2,12 +2,37 @@
     "simulation_parameters": {
         "g_constant": 1.0,
         "time_step": 0.001,
-        "softening_factor": 0.0
-
+        "num_steps": 10000,
+        "softening_factor": 0.0,
+        "theta": 0.5,
+        "gravity": "newton",
+        "integrator": "euler"
     },
     "visualizer_config": {
-        "names": ["Sun", "Earth", "Moon"],
-        "radii": [0.1, 0.001, 0.0005],
-        "colors": ["yellow", "blue", "gray"]
+        "window_title": "N-body 3D Visualizer",
+        "window_width": 1000,
+        "window_height": 700,
+        "step_rate": 100,
+        "enable_trails": true,
+        "trail_window": 150,
+        "camera_mode": "fly",
+        "spherical": true,
+        "default_radius": 0.1,
+        "enable_legend": true,
+        "names": [
+            "Sun",
+            "Earth",
+            "Moon"
+        ],
+        "radii": [
+            0.1,
+            0.001,
+            0.0005
+        ],
+        "colors": [
+            "yellow",
+            "blue",
+            "gray"
+        ]
     }
 }

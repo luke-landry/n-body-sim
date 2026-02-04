@@ -24,9 +24,11 @@ This project implements an N-body simulator that models the gravitational intera
 
 ### Launcher
 The launcher allows you to configure simulation parameters and body initial conditions:
-- **Parameter Configuration**: Set the gravitational constant (G), time step, number of steps, and softening factor
-- **Body Table**: Add, remove, and edit body properties (name, color, mass, position, velocity, radius)
+- **Parameter Configuration**: Set the various simulation parameters
+- **Visualization Configuration**: Configure graphics settings
+- **Body Table**: Add, remove, and edit body properties (name, color, radius, mass, position, velocity)
 - **Load/Save**: Load existing configurations or save your current setup
+- **Generate Random Scenario**: Generate a random N-body system
 - **Launch Simulation**: Start the physics simulation with your configured parameters
 
 ### Visualizer
@@ -164,8 +166,8 @@ The integrators used in this project are symplectic. In non-symplectic integrato
 
 #### **Gravity**
 These algorithms calculate the gravitational forces exerted on each body.
-- **Newtonian**: Calculates the force between every pair of bodies directly. This is perfectly accurate but slow for large systems, with a time complexity of *O*(*n*^2).
-- **Barnes-Hut (*planned*)**: An algorithm used for large-scale simulation (e.g. galaxies). It organizes bodies into a tree structure, treating distant groups of objects as a single combined mass. This introduces a small approximation error but significantly improves performance to *O*(*n* log *n*).
+- **Newtonian**: Calculates the force between every pair of bodies directly. This is perfectly accurate but slow for large systems, with a time complexity of $O(n^2)$.
+- **Barnes-Hut (*planned*)**: An algorithm used for large-scale simulation (e.g. galaxies). It organizes bodies into a tree structure, treating distant groups of objects as a single combined mass. This introduces a small approximation error but significantly improves performance to $O(n\ log\ n)$.
 
 #### **Softening Factor**
 Gravitational force is calculated using Newton's Law of Universal Gravitation:
