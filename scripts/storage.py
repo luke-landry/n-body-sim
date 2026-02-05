@@ -4,8 +4,6 @@ import numpy as np
 from typing import Any, cast
 from pathlib import Path
 from data import SimulationParameters, VisualizerConfig, BodyConfig, ScenarioConfig, SimulationData
-from visualizer import Visualizer
-
 
 IC_COLS = ["mass", "pos_x", "pos_y", "pos_z", "vel_x", "vel_y", "vel_z"]
 
@@ -83,8 +81,13 @@ def save_scenario(simulation_parameters: SimulationParameters, visualizer_config
         newline=''
     )
 
-def load_visualizer_config_from_json(json_path: Path) -> VisualizerConfig:
-    with open(json_path, 'r') as f:
+def load_visualizer_config_from_json(path: Path) -> VisualizerConfig:
+    if path.suffix != ".json":
+        raise ValueError(f"Unsupported file format for config data: {path.suffix}")
+    if not path.exists():
+        raise FileNotFoundError(f"The config data file {path} does not exist")
+    
+    with open(path, 'r') as f:
         data = json.load(f)
         if isinstance(data, dict):
             data = data.get("visualizer_config", {})
@@ -137,21 +140,13 @@ def load_simulation_data_from_bin(bin_path: Path) -> SimulationData:
     #TODO implement binary sim data file format
     raise RuntimeError("Binary simulation data format not supported yet")
 
-def create_visualizer_from_paths(data_path: Path, config_path: Path | None):
-    if not data_path.exists():
-        raise FileNotFoundError(f"The simulation data file {data_path} does not exist")
-    if config_path and not config_path.exists():
-        raise FileNotFoundError(f"The config data file {config_path} does not exist")
-    
-    if data_path.suffix == ".csv":
-        data = load_simulation_data_from_csv(data_path)
-    elif data_path.suffix == ".nbody":
-        data = load_simulation_data_from_bin(data_path)
+def load_simulation_data_from_path(path : Path) -> SimulationData:
+    if not path.exists():
+        raise FileNotFoundError(f"The simulation data file {path} does not exist")
+    if path.suffix == ".csv":
+        data = load_simulation_data_from_csv(path)
+    elif path.suffix == ".nbody":
+        data = load_simulation_data_from_bin(path)
     else:
-        raise ValueError(f"Unsupported file format for simulation data: {data_path.suffix}")
-    
-    if config_path and not config_path.suffix == ".json":
-        raise ValueError(f"Unsupported file format for config data: {config_path.suffix}")
-    config = load_visualizer_config_from_json(config_path) if config_path else VisualizerConfig()
-
-    return Visualizer(data, config)
+        raise ValueError(f"Unsupported file format for simulation data: {path.suffix}")
+    return data

@@ -1,100 +1,27 @@
 import sys
+import uuid
 from pathlib import Path
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, QFileDialog,
-    QDoubleSpinBox, QSpinBox, QFormLayout, QHeaderView, QComboBox, QCheckBox, QGroupBox)
-from PySide6.QtCore import Qt, Signal, QAbstractTableModel, QModelIndex, QProcess
+    QDoubleSpinBox, QSpinBox, QFormLayout, QHeaderView, QComboBox, QCheckBox, QGroupBox, QMessageBox)
 from data import BodyConfig, SimulationParameters, VisualizerConfig
+from models import BodyTableModel
+from runner import Runner
 import storage
 import generators
 
-# table model for body configurations in the launcher's table view
-class BodyTableModel(QAbstractTableModel):
-    def __init__(self, bodies: list[BodyConfig] | None = None):
-        super().__init__()
-        self.bodies = bodies or [BodyConfig.default(1)]
-        self.keys = list(BodyConfig.model_fields.keys())
-        self.headers = [k.replace('_', ' ').title() for k in self.keys]
-
-    def rowCount(self, parent=QModelIndex()):
-        return len(self.bodies)
-
-    def columnCount(self, parent=QModelIndex()):
-        return len(self.headers)
-
-    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
-        if not index.isValid():
-            return None
-        
-        body = self.bodies[index.row()]
-        key = self.keys[index.column()]
-        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
-            return getattr(body, key)
-        return None
-
-    def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
-        if not index.isValid():
-            return False
-        if role != Qt.ItemDataRole.EditRole:
-            return False
-        
-        key = self.keys[index.column()]
-        try:
-            if key not in ["name", "color"]:
-                value = float(value)
-            setattr(self.bodies[index.row()], key, value)
-            self.dataChanged.emit(index, index)
-            return True
-        except ValueError:
-            return False
-
-    def headerData(self, section, orientation, role):
-        if role != Qt.ItemDataRole.DisplayRole:
-            return None
-        if orientation == Qt.Orientation.Horizontal:
-            return self.headers[section]
-        if orientation == Qt.Orientation.Vertical:
-            return str(section + 1)
-        return None
-
-    def flags(self, index):
-        return Qt.ItemFlag.ItemIsEditable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
-
-    def add_body(self):
-        self.beginInsertRows(QModelIndex(), self.rowCount(), self.rowCount())
-        self.bodies.append(BodyConfig.default(len(self.bodies) + 1))
-        self.endInsertRows()
-
-    def remove_body(self, row):
-        if 0 <= row < len(self.bodies):
-            self.beginRemoveRows(QModelIndex(), row, row)
-            self.bodies.pop(row)
-            self.endRemoveRows()
-            return True
-        return False
 
 # main menu for configuring, launching, and viewing a simulation
 class Launcher(QWidget):
-
-    # signal contains paths to (output CSV, config JSON)
-    sim_complete = Signal(str, str)
-
-    # signal contains error message
-    sim_error = Signal(str)
-
-    # signal indicates simulation has started
-    sim_started = Signal()
-
     def __init__(self):
         super().__init__()
 
         BASE_PATH = Path(__file__).parents[1]
-        RUN_DIR_PATH = BASE_PATH / Path("data/run")
-        RUN_DIR_PATH.mkdir(parents=True, exist_ok=True)
 
-        self.RUN_IC_PATH = RUN_DIR_PATH / "sim.csv"
-        self.RUN_CONFIG_PATH = RUN_DIR_PATH / "sim.json"
-        self.RUN_OUTPUT_PATH = RUN_DIR_PATH / "output.csv"
+        self.RUN_DIR_PATH = BASE_PATH / Path("data/run")
+        self.RUN_DIR_PATH.mkdir(parents=True, exist_ok=True)
         self.BIN_PATH = BASE_PATH / "bin" / ("n-body-sim.exe" if sys.platform == "win32" else "n_body_sim_bin")
+
+        self.runners: list[Runner] = []
 
         self.initialize_ui()
         print("Launcher started")
@@ -109,9 +36,8 @@ class Launcher(QWidget):
         self.main_layout.addLayout(self.params_group)
 
         self.sim_group = QGroupBox("Simulation Parameters")
-        self.vis_group = QGroupBox("Visualization Config")
-
         self.params_group.addWidget(self.sim_group, 1)
+        self.vis_group = QGroupBox("Visualization Config")
         self.params_group.addWidget(self.vis_group, 1)
 
         self.initialize_ui_simulation_parameters()
@@ -122,7 +48,6 @@ class Launcher(QWidget):
     def initialize_ui_simulation_parameters(self):
         sim_form_layout = QFormLayout()
         default_sim = SimulationParameters()
-        default_vis = VisualizerConfig()
 
         # gravitational Constant (G)
         self.g_input = QDoubleSpinBox()
@@ -228,7 +153,7 @@ class Launcher(QWidget):
         self.main_layout.addWidget(self.body_table_view)
 
     def initialize_ui_controls(self):
-        # Button controls layout
+        # button controls layout
         button_layout = QHBoxLayout()
         self.add_btn = QPushButton("Add Body")
         self.add_btn.clicked.connect(self.body_table_model.add_body)
@@ -244,7 +169,7 @@ class Launcher(QWidget):
         button_layout.addWidget(self.save_btn)
         self.main_layout.addLayout(button_layout)
 
-        # Generator controls layout
+        # generator controls layout
         generator_layout = QHBoxLayout()
         self.generator_combo = QComboBox()
         self.generator_combo.addItems(generators.GENERATOR_NAMES)
@@ -304,7 +229,6 @@ class Launcher(QWidget):
         self.body_table_model.endResetModel()
 
     def handle_generate(self):
-        """Generate a random scenario using the selected generator."""
         try:
             n = self.generator_n_input.value()
             r = self.generator_r_input.value()
@@ -319,7 +243,7 @@ class Launcher(QWidget):
             self.update_bodies(bodies)
             print(f"Generated {len(bodies)} bodies using {generator_type}")
         except Exception as e:
-            self.sim_error.emit(f"Generation failed: {str(e)}")
+            self.show_error_dialog(f"Generation failed: {str(e)}")
 
     def handle_save(self):
         sim_params = self.build_simulation_parameters()
@@ -341,7 +265,7 @@ class Launcher(QWidget):
             storage.save_scenario(sim_params, visualizer_config, self.body_table_model.bodies, csv_path, json_path)
             print(f"Successfully saved:\n{csv_path}\n{json_path}")
         except Exception as e:
-            self.sim_error.emit(f"Save failed: {str(e)}")
+            self.show_error_dialog(f"Save failed: {str(e)}")
 
     def handle_load(self):
         path_str, _ = QFileDialog.getOpenFileName(
@@ -389,24 +313,37 @@ class Launcher(QWidget):
             
             print(f"Successfully loaded: {csv_path}")
         except Exception as e:
-            print(f"Load failed: {str(e)}")
-
+            self.show_error_dialog(f"Load failed: {str(e)}")
 
     def launch_sim(self):
         print("Preparing simulation...")
 
+        run_id = uuid.uuid4().hex[:8]
+
+        run_dir = self.RUN_DIR_PATH / f"run_{run_id}"
+        run_dir.mkdir(parents=True, exist_ok=False)
+
+        ic_path = run_dir / "sim.csv"
+        config_path = run_dir / "sim.json"
+        output_path = run_dir / "output.csv"
+
         if not self.BIN_PATH.is_file():
-            self.sim_error.emit(f"Physics engine binary not found at: {self.BIN_PATH}")
+            self.show_error_dialog(f"Physics engine binary not found at: {self.BIN_PATH}")
             return
         
         try:
             sim_params = self.build_simulation_parameters()
             visualizer_config = self.build_visualizer_config()
-            storage.save_scenario(sim_params, visualizer_config, self.body_table_model.bodies, self.RUN_IC_PATH, self.RUN_CONFIG_PATH)
+            storage.save_scenario(
+                sim_params,
+                visualizer_config,
+                self.body_table_model.bodies,
+                ic_path,
+                config_path)
             
             args = [
-                "-i", str(self.RUN_IC_PATH),
-                "-o", str(self.RUN_OUTPUT_PATH),
+                "-i", str(ic_path),
+                "-o", str(output_path),
                 "-g", str(self.g_input.value()),
                 "-t", str(self.dt_input.value()),
                 "-n", str(self.steps_input.value()),
@@ -417,30 +354,29 @@ class Launcher(QWidget):
             ]
 
             print(f"Launching simulation: {self.BIN_PATH} {' '.join(args)}")
+            runner = Runner(
+                parent=self,
+                bin_path=self.BIN_PATH,
+                ic_path=ic_path,
+                output_path=output_path,
+                config_path=config_path,
+                sim_args=args,
+            )
 
-            if hasattr(self, "sim_process") and self.sim_process.state() != QProcess.ProcessState.NotRunning:
-                self.sim_error.emit("Simulation already running.")
-                return
-
-            self.sim_process = QProcess(self)
-            self.sim_process.setProgram(str(self.BIN_PATH))
-            self.sim_process.setArguments(args)
-            self.sim_process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
-            self.sim_process.finished.connect(self.on_sim_complete)
-            self.sim_process.errorOccurred.connect(self.on_sim_error)
-            self.sim_started.emit()
-            self.sim_process.start()
+            runner.error.connect(self.show_error_dialog)
+            runner.finished.connect(lambda r=runner: self.runners.remove(r))
+            self.runners.append(runner)
+            runner.start()
         except Exception as e:
-            self.sim_error.emit(f"Error:\n{str(e)}")
+            self.show_error_dialog(f"Error:\n{str(e)}")
+            import traceback
+            traceback.print_exc()
 
-    def on_sim_complete(self, exit_code, exit_status):
-                output = self.sim_process.readAllStandardOutput().data().decode(errors="ignore")
-                if exit_status == QProcess.ExitStatus.NormalExit and exit_code == 0:
-                    print("Simulation finished")
-                    self.sim_complete.emit(str(self.RUN_OUTPUT_PATH), str(self.RUN_CONFIG_PATH))
-                else:
-                    self.sim_error.emit(f"Physics Engine Error:\n{output}")
-
-    def on_sim_error(self, process_error):
-                output = self.sim_process.readAllStandardOutput().data().decode(errors="ignore")
-                self.sim_error.emit(f"Physics Engine Error:\n{output or process_error}")
+    def show_error_dialog(self, error_message):
+        print(f"Error: {error_message}")
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Icon.Critical)
+        msg_box.setWindowTitle("Simulation Error")
+        msg_box.setText(error_message)
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg_box.exec()

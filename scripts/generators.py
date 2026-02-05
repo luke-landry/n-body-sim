@@ -32,8 +32,8 @@ def generate_single_star_system(
     
     PLANET_MASS_MIN = 1e-5
     PLANET_MASS_MAX = 1e-2
-    PLANET_RADIUS_MIN = 0.05
-    PLANET_RADIUS_MAX = 0.3
+    PLANET_RADIUS_MIN = 0.01
+    PLANET_RADIUS_MAX = 0.2
 
     bodies: list[BodyConfig] = []
     inc = np.deg2rad(max_inclination_deg)

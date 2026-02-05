@@ -210,7 +210,9 @@ if __name__ == "__main__":
 
     try:
         app = QApplication(sys.argv)
-        visualizer = storage.create_visualizer_from_paths(data_path, config_path)
+        data = storage.load_simulation_data_from_path(data_path)
+        config = storage.load_visualizer_config_from_json(config_path) if config_path else VisualizerConfig()
+        visualizer = Visualizer(data, config)
         visualizer.show()
         sys.exit(app.exec())
     except Exception as e:

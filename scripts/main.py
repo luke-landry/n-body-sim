@@ -1,10 +1,12 @@
-import sys
-from controller import Controller
+from PySide6.QtWidgets import QApplication
+from launcher import Launcher
 
 
 def main():
-    controller = Controller()
-    sys.exit(controller.run())
+    app = QApplication()
+    launcher = Launcher()
+    launcher.show()
+    return app.exec()
 
 if __name__ == '__main__':
     main()
