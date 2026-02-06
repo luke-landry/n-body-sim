@@ -4,7 +4,7 @@ A simulator for how multiple objects in space (bodies) move and interact with ea
 ![cover](images/cover.png)
 
 ## Overview
-This project implements an N-body simulator that models the gravitational interactions between bodies in 3D using numerical integration methods. The physics engine is written in Rust, and the configuration and visualization GUIs are implemented in Python using the Qt framework and VisPy.
+This project implements an N-body simulator that models the gravitational interactions between bodies in 3D using various numerical integration methods. The physics engine is written in Rust, and the configuration and visualization GUIs are implemented in Python using the Qt framework and VisPy.
 
 ## Quick Start
 ### Prerequisites
@@ -15,7 +15,7 @@ This project implements an N-body simulator that models the gravitational intera
 2. Run `install.bat` to setup the  virtual environment and install required packages (first time only)
 3. Run `run.bat` to start the application
 
-### Linux/macOS
+### Linux
 1. Download and extract the latest Linux release tarball
 2. Run `install.sh` to setup the virtual environment and install required packages (first time only)
 3. Run `run.sh` to launch the application
@@ -29,7 +29,9 @@ The launcher allows you to configure simulation parameters and body initial cond
 - **Body Table**: Add, remove, and edit body properties (name, color, radius, mass, position, velocity)
 - **Load/Save**: Load existing configurations or save your current setup
 - **Generate Random Scenario**: Generate a random N-body system
-- **Launch Simulation**: Start the physics simulation with your configured parameters
+- **Launch Simulation**: Start the physics simulation with your configured parameters and automatically display the visualization when complete
+- **Simulate Only**: Run the physics simulation without displaying the visualization. Prompts you to select a directory to save the results
+- **View Simulation**: Load and display the visualization of previously saved simulation results from a selected directory
 
 ### Visualizer
 
@@ -72,7 +74,7 @@ The Rust physics engine can also be run independently without installing Python 
 .\n-body-sim.exe -i data/examples/figure-eight.csv -o data/output.csv --time-step 0.01 --num-steps 10000 --integrator euler
 ```
 
-**Linux/macOS:**
+**Linux:**
 ```
 ./n-body-sim -i data/examples/figure-eight.csv -o data/output.csv --time-step 0.01 --num-steps 10000 --integrator euler
 ```
