@@ -1,16 +1,19 @@
-import numpy as np
 import random as rd
-from data import BodyConfig
+
+import numpy as np
+from schema import BodyConfig
+
 
 def generate_single_star_system(
-        n: int,
-        radius: float = 15.0,
-        star_mass = 1.0,
-        star_radius = 1.0,
-        min_radius = 2.0,
-        max_inclination_deg = 7.0,
-        G = 1.0) -> list[BodyConfig]:
-    
+    n: int,
+    radius: float = 15.0,
+    star_mass=1.0,
+    star_radius=1.0,
+    min_radius=2.0,
+    max_inclination_deg=7.0,
+    G=1.0,
+) -> list[BodyConfig]:
+
     PLANET_MASS_MIN = 1e-5
     PLANET_MASS_MAX = 1e-2
     PLANET_RADIUS_MIN = 0.01
@@ -36,9 +39,9 @@ def generate_single_star_system(
     )
 
     for i in range(1, n):
-        # steps to generate planet with random orbit and 
+        # steps to generate planet with random orbit and
         # inclination about the main orbital (x-y) plane:
-        #   1. Generate random position on the orbital plane and 
+        #   1. Generate random position on the orbital plane and
         #      get base cartesian position on the flat disk
         #   2. Calculate orbital velocity and base cartesian components
         #   3. Rotate base position and velocity about the x axis (incline)
@@ -47,19 +50,11 @@ def generate_single_star_system(
         # converting polar coordinates on the orbital plane to cartesian
         r = rd.uniform(min_radius, radius)
         theta = rd.uniform(0.0, 2.0 * np.pi)
-        base_pos = np.array([
-            r * np.cos(theta),
-            r * np.sin(theta),
-            0.0
-        ])
+        base_pos = np.array([r * np.cos(theta), r * np.sin(theta), 0.0])
 
         # equation for orbital velocity is v = sqrt(GM/r)
         v = np.sqrt(G * star_mass / r)
-        base_vel = np.array([
-            -v * np.sin(theta),
-             v * np.cos(theta),
-             0.0
-        ])
+        base_vel = np.array([-v * np.sin(theta), v * np.cos(theta), 0.0])
 
         cos_inc = np.cos(inc)
         sin_inc = np.sin(inc)
@@ -70,16 +65,12 @@ def generate_single_star_system(
         sin_omega = np.sin(omega)
 
         # define 3D rotation matrices
-        Rx = np.array([
-            [1.0,       0.0,        0.0     ],
-            [0.0,       cos_inc,    -sin_inc],
-            [0.0,       sin_inc,    cos_inc ]
-        ])
-        Rz = np.array([
-            [cos_omega,     -sin_omega,     0.0],
-            [sin_omega,     cos_omega,      0.0],
-            [0.0,           0.0,            1.0]
-        ])
+        Rx = np.array(
+            [[1.0, 0.0, 0.0], [0.0, cos_inc, -sin_inc], [0.0, sin_inc, cos_inc]]
+        )
+        Rz = np.array(
+            [[cos_omega, -sin_omega, 0.0], [sin_omega, cos_omega, 0.0], [0.0, 0.0, 1.0]]
+        )
 
         # apply matrix multiplication to position and velocity vectors
         R = Rz @ Rx
@@ -100,9 +91,8 @@ def generate_single_star_system(
                 vel_z=vel[2],
             )
         )
-    
+
     return bodies
 
-generators = {
-    "Star System": generate_single_star_system
-}
+
+generators = {"Star System": generate_single_star_system}

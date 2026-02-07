@@ -1,23 +1,37 @@
 import sys
 from datetime import datetime
 from pathlib import Path
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, QFileDialog,
-    QDoubleSpinBox, QSpinBox, QFormLayout, QHeaderView, QComboBox, QCheckBox, QGroupBox, QMessageBox)
-from PySide6.QtCore import Signal
-from data import BodyConfig, SimulationParameters, VisualizerConfig
-from models import BodyTableModel
-import storage
+
 import generators
+import storage
+from models import BodyTableModel
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QPushButton,
+    QSpinBox,
+    QTableView,
+    QVBoxLayout,
+    QWidget,
+)
+from schema import BodyConfig, SimulationParameters, VisualizerConfig
 
 
 # main menu for configuring, launching, and viewing a simulation
 class Launcher(QWidget):
     run_sim = Signal(
-        Path,                   # directory path
-        SimulationParameters,   # simulation parameters
-        list,                   # body configs
-        VisualizerConfig,       # visualizer config
-        bool                    # auto-run the visualizer afterwards
+        Path,  # directory path
+        SimulationParameters,  # simulation parameters
+        list,  # body configs
+        VisualizerConfig,  # visualizer config
+        bool,  # auto-run the visualizer afterwards
     )
     view_sim = Signal(Path)
     error = Signal(str)
@@ -28,7 +42,11 @@ class Launcher(QWidget):
         BASE_PATH = Path(__file__).parents[1]
         self.RUN_DIR_PATH = BASE_PATH / Path("data/run")
         self.RUN_DIR_PATH.mkdir(parents=True, exist_ok=True)
-        self.BIN_PATH = BASE_PATH / "bin" / ("n-body-sim.exe" if sys.platform == "win32" else "n_body_sim_bin")
+        self.BIN_PATH = (
+            BASE_PATH
+            / "bin"
+            / ("n-body-sim.exe" if sys.platform == "win32" else "n_body_sim_bin")
+        )
 
         self.initialize_ui()
         print("Launcher started")
@@ -58,7 +76,7 @@ class Launcher(QWidget):
 
         # gravitational Constant (G)
         self.g_input = QDoubleSpinBox()
-        self.g_input.setDecimals(15) # High precision for G
+        self.g_input.setDecimals(15)  # High precision for G
         self.g_input.setRange(0, 1)
         self.g_input.setValue(default_sim.g_constant)
         sim_form_layout.addRow("G Constant:", self.g_input)
@@ -156,7 +174,9 @@ class Launcher(QWidget):
         self.body_table_model = BodyTableModel()
         self.body_table_view = QTableView()
         self.body_table_view.setModel(self.body_table_model)
-        self.body_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch) # type: ignore
+        self.body_table_view.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch  # type: ignore
+        )  # type: ignore
         self.main_layout.addWidget(self.body_table_view)
 
     def initialize_ui_controls(self):
@@ -215,8 +235,8 @@ class Launcher(QWidget):
             num_steps=self.steps_input.value(),
             softening_factor=self.softening_input.value(),
             theta=self.theta_input.value(),
-            gravity=self.gravity_input.currentText(), # type: ignore
-            integrator=self.integrator_input.currentText() # type: ignore
+            gravity=self.gravity_input.currentText(),  # type: ignore
+            integrator=self.integrator_input.currentText(),  # type: ignore
         )
 
     def unpack_simulation_parameters(self, sim_params: SimulationParameters) -> None:
@@ -233,10 +253,10 @@ class Launcher(QWidget):
             step_rate=self.step_rate_input.value(),
             enable_trails=self.enable_trails_input.isChecked(),
             trail_window=self.trail_window_input.value(),
-            camera_mode=self.camera_mode_input.currentText(), # type: ignore
+            camera_mode=self.camera_mode_input.currentText(),  # type: ignore
             spherical=self.spherical_input.isChecked(),
             default_radius=self.default_radius_input.value(),
-            enable_legend=self.enable_legend_input.isChecked()
+            enable_legend=self.enable_legend_input.isChecked(),
         )
 
     def unpack_visualizer_config(self, visualizer_config: VisualizerConfig) -> None:
@@ -261,16 +281,24 @@ class Launcher(QWidget):
         self.update_bodies(bodies)
 
     def handle_save(self):
-        sim_params = self.pack_simulation_parameters()
-        visualizer_config = self.pack_visualizer_config()
         csv_path = self.show_csv_file_save_dialog("Save Initial Conditions")
         if not csv_path:
             return
         json_path = csv_path.with_suffix(".json")
-        
+        sim_params = self.pack_simulation_parameters()
+        visualizer_config = self.pack_visualizer_config()
+
         try:
-            storage.save_scenario(sim_params, visualizer_config, self.body_table_model.bodies, csv_path, json_path)
-            print(f"Scenario saved successfully:\n\tinitial conditions: {csv_path}\n\tconfig: {json_path}")
+            storage.save_scenario(
+                sim_params,
+                visualizer_config,
+                self.body_table_model.bodies,
+                csv_path,
+                json_path,
+            )
+            print(
+                f"Scenario saved successfully:\n\tinitial conditions: {csv_path}\n\tconfig: {json_path}"
+            )
         except Exception as e:
             self.error.emit(f"Save failed: {str(e)}")
 
@@ -279,10 +307,17 @@ class Launcher(QWidget):
         if not csv_path:
             return
         json_path = csv_path.with_suffix(".json") if csv_path.exists() else None
-        
+
+        sim_params = None
+        visualizer_config = None
+        new_bodies = []
         try:
-            sim_params, visualizer_config, new_bodies = storage.load_scenario(csv_path, json_path)
-            print(f"Scenario loaded successfully:\n\tinitial conditions: {csv_path}\n\tconfig: {json_path}")
+            sim_params, visualizer_config, new_bodies = storage.load_scenario(
+                csv_path, json_path
+            )
+            print(
+                f"Scenario loaded successfully:\n\tinitial conditions: {csv_path}\n\tconfig: {json_path}"
+            )
         except Exception as e:
             self.error.emit(f"Load failed: {str(e)}")
 
@@ -301,9 +336,9 @@ class Launcher(QWidget):
             sim_parameters,
             self.body_table_model.bodies,
             visualizer_config,
-            True #TODO change this with option
+            True,  # TODO change this with option
         )
-    
+
     def launch_view_sim(self):
         path = self.show_sim_file_open_dialog("Select simulation output file to view")
         self.view_sim.emit(path)
@@ -316,36 +351,24 @@ class Launcher(QWidget):
 
     def show_directory_select_dialog(self, caption) -> Path | None:
         path_str = QFileDialog.getExistingDirectory(
-            self,
-            caption,
-            str(self.RUN_DIR_PATH)
+            self, caption, str(self.RUN_DIR_PATH)
         )
         return Path(path_str) if path_str else None
-    
+
     def show_csv_file_save_dialog(self, caption) -> Path | None:
         path_str, _ = QFileDialog.getSaveFileName(
-            self,
-            caption,
-            "",
-            "CSV Files (*.csv)"
+            self, caption, "", "CSV Files (*.csv)"
         )
         return Path(path_str) if path_str else None
-    
+
     def show_csv_file_open_dialog(self, caption) -> Path | None:
         path_str, _ = QFileDialog.getOpenFileName(
-            self,
-            caption,
-            "",
-            "CSV Files (*.csv)"
+            self, caption, "", "CSV Files (*.csv)"
         )
         return Path(path_str) if path_str else None
-    
+
     def show_sim_file_open_dialog(self, caption) -> Path | None:
         path_str, _ = QFileDialog.getOpenFileName(
-            self,
-            caption,
-            "",
-            "Simulation data (*.csv *.nbody)"
+            self, caption, "", "Simulation data (*.csv *.nbody)"
         )
         return Path(path_str) if path_str else None
-    

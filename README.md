@@ -18,7 +18,7 @@ This project implements an N-body simulator that models the gravitational intera
 ### Linux
 1. Download and extract the latest Linux release tarball
 2. Run `install.sh` to setup the virtual environment and install required packages (first time only)
-3. Run `run.sh` to launch the application
+3. Run `run.sh` to start the application
 
 ## GUI Usage
 

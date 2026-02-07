@@ -1,8 +1,17 @@
-import numpy as np
-import random as rd
 from dataclasses import dataclass
 from typing import Literal
-from pydantic import BaseModel, PositiveFloat, PositiveInt, NonNegativeInt, NonNegativeFloat, Field, ConfigDict
+
+import numpy as np
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    NonNegativeFloat,
+    NonNegativeInt,
+    PositiveFloat,
+    PositiveInt,
+)
+
 
 class SimulationParameters(BaseModel):
     g_constant: float = 1.0
@@ -10,8 +19,9 @@ class SimulationParameters(BaseModel):
     num_steps: PositiveInt = 10000
     softening_factor: float = 0.05
     theta: PositiveFloat = 0.5
-    gravity: Literal['newton'] = 'newton'
-    integrator: Literal['euler'] = 'euler'
+    gravity: Literal["newton"] = "newton"
+    integrator: Literal["euler"] = "euler"
+
 
 class VisualizerConfig(BaseModel):
     window_title: str = "N-body 3D Visualizer"
@@ -20,7 +30,7 @@ class VisualizerConfig(BaseModel):
     step_rate: PositiveInt = 100
     enable_trails: bool = True
     trail_window: NonNegativeInt = 150
-    camera_mode: Literal['fly', 'turntable'] = 'fly'
+    camera_mode: Literal["fly", "turntable"] = "fly"
     spherical: bool = True
     default_radius: NonNegativeFloat = 0.1
     enable_legend: bool = True
@@ -28,9 +38,11 @@ class VisualizerConfig(BaseModel):
     radii: list[float] = Field(default_factory=list)
     colors: list[str] = Field(default_factory=list)
 
+
 class ScenarioConfig(BaseModel):
     simulation_parameters: SimulationParameters
     visualizer_config: VisualizerConfig
+
 
 class BodyConfig(BaseModel):
     model_config = ConfigDict(validate_assignment=True)
@@ -59,12 +71,13 @@ class BodyConfig(BaseModel):
             vel_y=0.0,
             vel_z=0.0,
         )
-    
+
+
 @dataclass
 class SimulationData:
-    positions: np.ndarray   # shape: (T, N, 3)
-    times: np.ndarray       # shape: (T,)
-    ids: np.ndarray         # shape: (N,)
+    positions: np.ndarray  # shape: (T, N, 3)
+    times: np.ndarray  # shape: (T,)
+    ids: np.ndarray  # shape: (N,)
 
     def __post_init__(self):
         if self.positions.ndim != 3:
@@ -84,6 +97,8 @@ class SimulationData:
             raise ValueError(f"T mismatch: positions has {t_pos}, times has {t_time}")
         if n_pos != n_id:
             raise ValueError(f"N mismatch: positions has {n_pos}, ids has {n_id}")
-        
+
         if np.isnan(self.positions).any():
-            raise ValueError("Simulation positions contain NaN values. The input data is likely corrupt.")
+            raise ValueError(
+                "Simulation positions contain NaN values. The input data is likely corrupt."
+            )

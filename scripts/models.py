@@ -1,5 +1,11 @@
-from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex
-from data import BodyConfig
+from PySide6.QtCore import (
+    QAbstractTableModel,
+    QModelIndex,
+    QPersistentModelIndex,
+    Qt,
+)
+from schema import BodyConfig
+
 
 # table model for body configurations in the launcher's table view
 class BodyTableModel(QAbstractTableModel):
@@ -7,30 +13,30 @@ class BodyTableModel(QAbstractTableModel):
         super().__init__()
         self.bodies = bodies or [BodyConfig.default(1)]
         self.keys = list(BodyConfig.model_fields.keys())
-        self.headers = [k.replace('_', ' ').title() for k in self.keys]
+        self.headers = [k.replace("_", " ").title() for k in self.keys]
 
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()):
         return len(self.bodies)
 
-    def columnCount(self, parent=QModelIndex()):
+    def columnCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()):
         return len(self.headers)
 
-    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+    def data(self, index, role: int = Qt.ItemDataRole.DisplayRole):
         if not index.isValid():
             return None
-        
+
         body = self.bodies[index.row()]
         key = self.keys[index.column()]
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
             return getattr(body, key)
         return None
 
-    def setData(self, index, value, role=Qt.ItemDataRole.EditRole):
+    def setData(self, index, value, role: int = Qt.ItemDataRole.EditRole):
         if not index.isValid():
             return False
         if role != Qt.ItemDataRole.EditRole:
             return False
-        
+
         key = self.keys[index.column()]
         try:
             if key not in ["name", "color"]:
@@ -41,7 +47,7 @@ class BodyTableModel(QAbstractTableModel):
         except ValueError:
             return False
 
-    def headerData(self, section, orientation, role):
+    def headerData(self, section, orientation, role: int = Qt.ItemDataRole.DisplayRole):
         if role != Qt.ItemDataRole.DisplayRole:
             return None
         if orientation == Qt.Orientation.Horizontal:
@@ -51,7 +57,11 @@ class BodyTableModel(QAbstractTableModel):
         return None
 
     def flags(self, index):
-        return Qt.ItemFlag.ItemIsEditable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+        return (
+            Qt.ItemFlag.ItemIsEditable
+            | Qt.ItemFlag.ItemIsEnabled
+            | Qt.ItemFlag.ItemIsSelectable
+        )
 
     def add_body(self):
         self.beginInsertRows(QModelIndex(), self.rowCount(), self.rowCount())
