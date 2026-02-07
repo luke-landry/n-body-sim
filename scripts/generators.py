@@ -2,25 +2,6 @@ import numpy as np
 import random as rd
 from data import BodyConfig
 
-def scale_radius_by_mass(
-        mass: float,
-        mass_min: float,
-        mass_max: float,
-        radius_min: float,
-        radius_max: float
-) -> float:
-
-    if mass_max <= mass_min:
-        raise ValueError("mass_max must be greater than mass_min")
-    if radius_max <= radius_min:
-        raise ValueError("radius_max must be greater than radius_min")
-
-    factor = (mass - mass_min) / (mass_max - mass_min)
-    factor = max(0.0, min(1.0, factor))
-    return radius_min + factor * (radius_max - radius_min)
-
-GENERATOR_NAMES = ["Star System"]
-
 def generate_single_star_system(
         n: int,
         radius: float = 15.0,
@@ -105,19 +86,12 @@ def generate_single_star_system(
         pos = R @ base_pos
         vel = R @ base_vel
 
-        planet_mass = rd.uniform(PLANET_MASS_MIN, PLANET_MASS_MAX)
-        planet_radius = scale_radius_by_mass(planet_mass,
-                                      PLANET_MASS_MIN,
-                                      PLANET_MASS_MAX,
-                                      PLANET_RADIUS_MIN,
-                                      PLANET_RADIUS_MAX)
-
         bodies.append(
             BodyConfig(
                 name=f"Planet {i}",
                 color=f"#{rd.randint(0, 0xFFFFFF):06x}",
-                radius=planet_radius,
-                mass=planet_mass,
+                radius=rd.uniform(PLANET_RADIUS_MIN, PLANET_RADIUS_MAX),
+                mass=rd.uniform(PLANET_MASS_MIN, PLANET_MASS_MAX),
                 pos_x=pos[0],
                 pos_y=pos[1],
                 pos_z=pos[2],
@@ -128,3 +102,7 @@ def generate_single_star_system(
         )
     
     return bodies
+
+generators = {
+    "Star System": generate_single_star_system
+}

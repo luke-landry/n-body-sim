@@ -3,25 +3,32 @@ from datetime import datetime
 from pathlib import Path
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, QFileDialog,
     QDoubleSpinBox, QSpinBox, QFormLayout, QHeaderView, QComboBox, QCheckBox, QGroupBox, QMessageBox)
+from PySide6.QtCore import Signal
 from data import BodyConfig, SimulationParameters, VisualizerConfig
 from models import BodyTableModel
-from runner import Runner
 import storage
 import generators
 
 
 # main menu for configuring, launching, and viewing a simulation
 class Launcher(QWidget):
+    run_sim = Signal(
+        Path,                   # directory path
+        SimulationParameters,   # simulation parameters
+        list,                   # body configs
+        VisualizerConfig,       # visualizer config
+        bool                    # auto-run the visualizer afterwards
+    )
+    view_sim = Signal(Path)
+    error = Signal(str)
+
     def __init__(self):
         super().__init__()
 
         BASE_PATH = Path(__file__).parents[1]
-
         self.RUN_DIR_PATH = BASE_PATH / Path("data/run")
         self.RUN_DIR_PATH.mkdir(parents=True, exist_ok=True)
         self.BIN_PATH = BASE_PATH / "bin" / ("n-body-sim.exe" if sys.platform == "win32" else "n_body_sim_bin")
-
-        self.runners: list[Runner] = []
 
         self.initialize_ui()
         print("Launcher started")
@@ -172,7 +179,7 @@ class Launcher(QWidget):
         # generator controls layout
         generator_layout = QHBoxLayout()
         self.generator_combo = QComboBox()
-        self.generator_combo.addItems(generators.GENERATOR_NAMES)
+        self.generator_combo.addItems(list(generators.generators.keys()))
         generator_layout.addWidget(self.generator_combo)
         self.generator_n_input = QSpinBox()
         self.generator_n_input.setPrefix("n: ")
@@ -193,25 +200,15 @@ class Launcher(QWidget):
         # launch button
         self.launch_sim_btn = QPushButton("Launch Simulation")
         self.launch_sim_btn.setMinimumHeight(50)
-        self.launch_sim_btn.clicked.connect(self.launch_sim)
+        self.launch_sim_btn.clicked.connect(self.launch_run_sim)
         self.main_layout.addWidget(self.launch_sim_btn)
-
-        # simulate and view buttons layout
-        sim_view_layout = QHBoxLayout()
-        self.simulate_only_btn = QPushButton("Simulate Only")
-        self.simulate_only_btn.clicked.connect(self.launch_sim_only)
-        sim_view_layout.addWidget(self.simulate_only_btn)
-        self.view_simulation_btn = QPushButton("View Simulation")
-        self.view_simulation_btn.clicked.connect(self.launch_visualizer_only)
-        sim_view_layout.addWidget(self.view_simulation_btn)
-        self.main_layout.addLayout(sim_view_layout)
 
     def remove_selected_body(self):
         selection = self.body_table_view.selectionModel().currentIndex()
         if selection.isValid():
             self.body_table_model.remove_body(selection.row())
 
-    def build_simulation_parameters(self) -> SimulationParameters:
+    def pack_simulation_parameters(self) -> SimulationParameters:
         return SimulationParameters(
             g_constant=self.g_input.value(),
             time_step=self.dt_input.value(),
@@ -222,7 +219,16 @@ class Launcher(QWidget):
             integrator=self.integrator_input.currentText() # type: ignore
         )
 
-    def build_visualizer_config(self) -> VisualizerConfig:
+    def unpack_simulation_parameters(self, sim_params: SimulationParameters) -> None:
+        self.g_input.setValue(sim_params.g_constant)
+        self.dt_input.setValue(sim_params.time_step)
+        self.steps_input.setValue(sim_params.num_steps)
+        self.softening_input.setValue(sim_params.softening_factor)
+        self.theta_input.setValue(sim_params.theta)
+        self.gravity_input.setCurrentText(sim_params.gravity)
+        self.integrator_input.setCurrentText(sim_params.integrator)
+
+    def pack_visualizer_config(self) -> VisualizerConfig:
         return VisualizerConfig(
             step_rate=self.step_rate_input.value(),
             enable_trails=self.enable_trails_input.isChecked(),
@@ -233,268 +239,113 @@ class Launcher(QWidget):
             enable_legend=self.enable_legend_input.isChecked()
         )
 
+    def unpack_visualizer_config(self, visualizer_config: VisualizerConfig) -> None:
+        self.step_rate_input.setValue(visualizer_config.step_rate)
+        self.enable_trails_input.setChecked(visualizer_config.enable_trails)
+        self.trail_window_input.setValue(visualizer_config.trail_window)
+        self.camera_mode_input.setCurrentText(visualizer_config.camera_mode)
+        self.spherical_input.setChecked(visualizer_config.spherical)
+        self.default_radius_input.setValue(visualizer_config.default_radius)
+        self.enable_legend_input.setChecked(visualizer_config.enable_legend)
+
     def update_bodies(self, bodies: list[BodyConfig]):
         self.body_table_model.beginResetModel()
         self.body_table_model.bodies = bodies
         self.body_table_model.endResetModel()
 
     def handle_generate(self):
-        try:
-            n = self.generator_n_input.value()
-            r = self.generator_r_input.value()
-            generator_type = self.generator_combo.currentText()
-            
-            if generator_type == "Star System":
-                bodies = generators.generate_single_star_system(n, radius=r)
-            else:
-                print(f"Unknown generator type: {generator_type}")
-                return
-            
-            self.update_bodies(bodies)
-            print(f"Generated {len(bodies)} bodies using {generator_type}")
-        except Exception as e:
-            self.show_error_dialog(f"Generation failed: {str(e)}")
+        generator_type = self.generator_combo.currentText()
+        n = self.generator_n_input.value()
+        r = self.generator_r_input.value()
+        bodies = generators.generators[generator_type](n, radius=r)
+        self.update_bodies(bodies)
 
     def handle_save(self):
-        sim_params = self.build_simulation_parameters()
-        visualizer_config = self.build_visualizer_config()
-
-        path_str, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Initial Conditions",
-            "",
-            "CSV Files (*.csv)"
-        )
-
-        if not path_str:
+        sim_params = self.pack_simulation_parameters()
+        visualizer_config = self.pack_visualizer_config()
+        csv_path = self.show_csv_file_save_dialog("Save Initial Conditions")
+        if not csv_path:
             return
-
-        csv_path = Path(path_str)
         json_path = csv_path.with_suffix(".json")
+        
         try:
             storage.save_scenario(sim_params, visualizer_config, self.body_table_model.bodies, csv_path, json_path)
-            print(f"Successfully saved:\n{csv_path}\n{json_path}")
+            print(f"Scenario saved successfully:\n\tinitial conditions: {csv_path}\n\tconfig: {json_path}")
         except Exception as e:
-            self.show_error_dialog(f"Save failed: {str(e)}")
+            self.error.emit(f"Save failed: {str(e)}")
 
     def handle_load(self):
-        path_str, _ = QFileDialog.getOpenFileName(
-            self,
-            "Open Initial Conditions",
-            "",
-            "CSV Files (*.csv)"
-        )
-
-        if not path_str:
+        csv_path = self.show_csv_file_open_dialog("Open Initial Conditions")
+        if not csv_path:
             return
-        
-        csv_path = Path(path_str)
-        json_path = csv_path.with_suffix(".json")
-
-        # json configuration is optional
-        if not json_path.exists():
-            json_path = None
+        json_path = csv_path.with_suffix(".json") if csv_path.exists() else None
         
         try:
             sim_params, visualizer_config, new_bodies = storage.load_scenario(csv_path, json_path)
-            self.body_table_model.beginResetModel()
-            self.body_table_model.bodies = new_bodies
-            self.body_table_model.endResetModel()
-            
-            # Update simulation parameters if they exist
-            if sim_params:
-                self.g_input.setValue(sim_params.g_constant)
-                self.dt_input.setValue(sim_params.time_step)
-                self.steps_input.setValue(sim_params.num_steps)
-                self.softening_input.setValue(sim_params.softening_factor)
-                self.theta_input.setValue(sim_params.theta)
-                self.gravity_input.setCurrentText(sim_params.gravity)
-                self.integrator_input.setCurrentText(sim_params.integrator)
-
-            # Update visualizer configuration if it exists
-            if visualizer_config:
-                self.step_rate_input.setValue(visualizer_config.step_rate)
-                self.enable_trails_input.setChecked(visualizer_config.enable_trails)
-                self.trail_window_input.setValue(visualizer_config.trail_window)
-                self.camera_mode_input.setCurrentText(visualizer_config.camera_mode)
-                self.spherical_input.setChecked(visualizer_config.spherical)
-                self.default_radius_input.setValue(visualizer_config.default_radius)
-                self.enable_legend_input.setChecked(visualizer_config.enable_legend)
-            
-            print(f"Successfully loaded: {csv_path}")
+            print(f"Scenario loaded successfully:\n\tinitial conditions: {csv_path}\n\tconfig: {json_path}")
         except Exception as e:
-            self.show_error_dialog(f"Load failed: {str(e)}")
+            self.error.emit(f"Load failed: {str(e)}")
 
-    def launch_sim(self):
-        print("Preparing simulation...")
+        if sim_params:
+            self.unpack_simulation_parameters(sim_params)
+        if visualizer_config:
+            self.unpack_visualizer_config(visualizer_config)
+        self.update_bodies(new_bodies)
 
+    def launch_run_sim(self):
+        path = self.generate_run_directory_path()
+        sim_parameters = self.pack_simulation_parameters()
+        visualizer_config = self.pack_visualizer_config()
+        self.run_sim.emit(
+            path,
+            sim_parameters,
+            self.body_table_model.bodies,
+            visualizer_config,
+            True #TODO change this with option
+        )
+    
+    def launch_view_sim(self):
+        path = self.show_sim_file_open_dialog("Select simulation output file to view")
+        self.view_sim.emit(path)
+
+    def generate_run_directory_path(self) -> Path:
         run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-
         run_dir = self.RUN_DIR_PATH / f"run_{run_id}"
         run_dir.mkdir(parents=True, exist_ok=False)
+        return run_dir
 
-        ic_path = run_dir / "sim.csv"
-        config_path = run_dir / "sim.json"
-        output_path = run_dir / "output.csv"
-
-        if not self.BIN_PATH.is_file():
-            self.show_error_dialog(f"Physics engine binary not found at: {self.BIN_PATH}")
-            return
-        
-        try:
-            sim_params = self.build_simulation_parameters()
-            visualizer_config = self.build_visualizer_config()
-            storage.save_scenario(
-                sim_params,
-                visualizer_config,
-                self.body_table_model.bodies,
-                ic_path,
-                config_path)
-            
-            args = [
-                "-i", str(ic_path),
-                "-o", str(output_path),
-                "-g", str(self.g_input.value()),
-                "-t", str(self.dt_input.value()),
-                "-n", str(self.steps_input.value()),
-                "--softening-factor", str(self.softening_input.value()),
-                "--theta", str(self.theta_input.value()),
-                "--gravity", self.gravity_input.currentText(),
-                "--integrator", self.integrator_input.currentText()
-            ]
-
-            print(f"Launching simulation: {self.BIN_PATH} {' '.join(args)}")
-            runner = Runner(
-                parent=self,
-                bin_path=self.BIN_PATH,
-                ic_path=ic_path,
-                output_path=output_path,
-                config_path=config_path,
-                sim_args=args,
-            )
-
-            runner.error.connect(self.show_error_dialog)
-            runner.finished.connect(lambda r=runner: self.runners.remove(r))
-            self.runners.append(runner)
-            runner.run_simulator_and_view()
-        except Exception as e:
-            self.show_error_dialog(f"Error:\n{str(e)}")
-            import traceback
-            traceback.print_exc()
-
-    def launch_sim_only(self):
-        print("Preparing simulation (without visualization)...")
-
-        # Let user pick where to save the simulation
-        run_dir_str = QFileDialog.getExistingDirectory(
+    def show_directory_select_dialog(self, caption) -> Path | None:
+        path_str = QFileDialog.getExistingDirectory(
             self,
-            "Select directory to save simulation results",
+            caption,
             str(self.RUN_DIR_PATH)
         )
-
-        if not run_dir_str:
-            return
-
-        run_dir = Path(run_dir_str)
-        run_dir.mkdir(parents=True, exist_ok=True)
-
-        ic_path = run_dir / "sim.csv"
-        config_path = run_dir / "sim.json"
-        output_path = run_dir / "output.csv"
-
-        if not self.BIN_PATH.is_file():
-            self.show_error_dialog(f"Physics engine binary not found at: {self.BIN_PATH}")
-            return
-        
-        try:
-            sim_params = self.build_simulation_parameters()
-            visualizer_config = self.build_visualizer_config()
-            storage.save_scenario(
-                sim_params,
-                visualizer_config,
-                self.body_table_model.bodies,
-                ic_path,
-                config_path)
-            
-            args = [
-                "-i", str(ic_path),
-                "-o", str(output_path),
-                "-g", str(self.g_input.value()),
-                "-t", str(self.dt_input.value()),
-                "-n", str(self.steps_input.value()),
-                "--softening-factor", str(self.softening_input.value()),
-                "--theta", str(self.theta_input.value()),
-                "--gravity", self.gravity_input.currentText(),
-                "--integrator", self.integrator_input.currentText()
-            ]
-
-            print(f"Launching simulation: {self.BIN_PATH} {' '.join(args)}")
-            runner = Runner(
-                parent=self,
-                bin_path=self.BIN_PATH,
-                ic_path=ic_path,
-                output_path=output_path,
-                config_path=config_path,
-                sim_args=args,
-            )
-
-            runner.error.connect(self.show_error_dialog)
-            runner.finished.connect(lambda r=runner: self.runners.remove(r))
-            self.runners.append(runner)
-            runner.run_simulator_only()
-        except Exception as e:
-            self.show_error_dialog(f"Error:\n{str(e)}")
-            import traceback
-            traceback.print_exc()
-
-    def launch_visualizer_only(self):
-        try:
-            # Let user pick the directory containing simulation results
-            run_dir_str = QFileDialog.getExistingDirectory(
-                self,
-                "Select simulation results directory",
-                str(self.RUN_DIR_PATH)
-            )
-
-            if not run_dir_str:
-                return
-            
-            run_dir = Path(run_dir_str)
-            output_path = run_dir / "output.csv"
-            config_path = run_dir / "sim.json"
-            
-            if not output_path.exists():
-                self.show_error_dialog(f"Output file not found in {run_dir}")
-                return
-            
-            if not config_path.exists():
-                self.show_error_dialog(f"Config file not found in {run_dir}")
-                return
-            
-            print(f"Loading simulation results from {run_dir}")
-            runner = Runner(
-                parent=self,
-                bin_path=self.BIN_PATH,
-                ic_path=run_dir / "sim.csv",
-                output_path=output_path,
-                config_path=config_path,
-                sim_args=[],
-            )
-
-            runner.error.connect(self.show_error_dialog)
-            runner.finished.connect(lambda r=runner: self.runners.remove(r))
-            self.runners.append(runner)
-            runner.run_visualizer_only()
-        except Exception as e:
-            self.show_error_dialog(f"Error:\n{str(e)}")
-            import traceback
-            traceback.print_exc()
-
-    def show_error_dialog(self, error_message):
-        print(f"Error: {error_message}")
-        msg_box = QMessageBox(self)
-        msg_box.setIcon(QMessageBox.Icon.Critical)
-        msg_box.setWindowTitle("Simulation Error")
-        msg_box.setText(error_message)
-        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-        msg_box.exec()
+        return Path(path_str) if path_str else None
+    
+    def show_csv_file_save_dialog(self, caption) -> Path | None:
+        path_str, _ = QFileDialog.getSaveFileName(
+            self,
+            caption,
+            "",
+            "CSV Files (*.csv)"
+        )
+        return Path(path_str) if path_str else None
+    
+    def show_csv_file_open_dialog(self, caption) -> Path | None:
+        path_str, _ = QFileDialog.getOpenFileName(
+            self,
+            caption,
+            "",
+            "CSV Files (*.csv)"
+        )
+        return Path(path_str) if path_str else None
+    
+    def show_sim_file_open_dialog(self, caption) -> Path | None:
+        path_str, _ = QFileDialog.getOpenFileName(
+            self,
+            caption,
+            "",
+            "Simulation data (*.csv *.nbody)"
+        )
+        return Path(path_str) if path_str else None
+    
