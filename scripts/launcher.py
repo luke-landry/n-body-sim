@@ -23,6 +23,10 @@ from PySide6.QtWidgets import (
 )
 from schema import BodyConfig, SimulationParameters, VisualizerConfig
 
+INITIAL_CONDITIONS_FILENAME = "initial_conditions.csv"
+CONFIG_FILENAME = "config.json"
+OUTPUT_FILENAME = "output.csv"
+
 
 # main menu for configuring, launching, and viewing a simulation
 class Launcher(QWidget):
@@ -42,11 +46,6 @@ class Launcher(QWidget):
         BASE_PATH = Path(__file__).parents[1]
         self.RUN_DIR_PATH = BASE_PATH / Path("data/run")
         self.RUN_DIR_PATH.mkdir(parents=True, exist_ok=True)
-        self.BIN_PATH = (
-            BASE_PATH
-            / "bin"
-            / ("n-body-sim.exe" if sys.platform == "win32" else "n_body_sim_bin")
-        )
 
         self.initialize_ui()
         print("Launcher started")
@@ -212,16 +211,29 @@ class Launcher(QWidget):
         self.generator_r_input.setRange(1.0, 100.0)
         self.generator_r_input.setValue(15.0)
         generator_layout.addWidget(self.generator_r_input)
-        self.generate_btn = QPushButton("Generate Random Scenario")
+        self.generate_btn = QPushButton("Generate Scenario")
         self.generate_btn.clicked.connect(self.handle_generate)
         generator_layout.addWidget(self.generate_btn)
         self.main_layout.addLayout(generator_layout)
 
         # launch button
-        self.launch_sim_btn = QPushButton("Launch Simulation")
+        self.launch_sim_btn = QPushButton("Launch and View Simulation")
         self.launch_sim_btn.setMinimumHeight(50)
         self.launch_sim_btn.clicked.connect(self.launch_run_sim)
         self.main_layout.addWidget(self.launch_sim_btn)
+
+        launch_suboptions_layout = QHBoxLayout()
+        self.launch_sim_only_btn = QPushButton("Run Simulation Only")
+        self.launch_sim_only_btn.setMinimumHeight(40)
+        self.launch_sim_only_btn.clicked.connect(self.launch_run_sim_only)
+        self.main_layout.addWidget(self.launch_sim_only_btn)
+        launch_suboptions_layout.addWidget(self.launch_sim_only_btn)
+        self.launch_vis_btn = QPushButton("Load Visualization")
+        self.launch_vis_btn.setMinimumHeight(40)
+        self.launch_vis_btn.clicked.connect(self.launch_view_sim)
+        self.main_layout.addWidget(self.launch_vis_btn)
+        launch_suboptions_layout.addWidget(self.launch_vis_btn)
+        self.main_layout.addLayout(launch_suboptions_layout)
 
     def remove_selected_body(self):
         selection = self.body_table_view.selectionModel().currentIndex()
@@ -284,7 +296,9 @@ class Launcher(QWidget):
         csv_path = self.show_csv_file_save_dialog("Save Initial Conditions")
         if not csv_path:
             return
-        json_path = csv_path.with_suffix(".json")
+        if csv_path.suffix != ".csv":
+            csv_path = csv_path.with_suffix(".csv")
+        json_path = csv_path.parent / CONFIG_FILENAME
         sim_params = self.pack_simulation_parameters()
         visualizer_config = self.pack_visualizer_config()
 
@@ -306,7 +320,7 @@ class Launcher(QWidget):
         csv_path = self.show_csv_file_open_dialog("Open Initial Conditions")
         if not csv_path:
             return
-        json_path = csv_path.with_suffix(".json") if csv_path.exists() else None
+        json_path = csv_path.parent / CONFIG_FILENAME
 
         sim_params = None
         visualizer_config = None
@@ -336,11 +350,29 @@ class Launcher(QWidget):
             sim_parameters,
             self.body_table_model.bodies,
             visualizer_config,
-            True,  # TODO change this with option
+            True,  # auto-run the visualizer afterwards
+        )
+
+    def launch_run_sim_only(self):
+        path = self.show_directory_select_dialog("Select location to run simulation")
+        if not path:
+            return
+        sim_parameters = self.pack_simulation_parameters()
+        visualizer_config = self.pack_visualizer_config()
+        self.run_sim.emit(
+            path,
+            sim_parameters,
+            self.body_table_model.bodies,
+            visualizer_config,
+            False,  # do not auto-run the visualizer afterwards
         )
 
     def launch_view_sim(self):
-        path = self.show_sim_file_open_dialog("Select simulation output file to view")
+        path = self.show_directory_select_dialog(
+            "Select simulation output file to view"
+        )
+        if not path:
+            return
         self.view_sim.emit(path)
 
     def generate_run_directory_path(self) -> Path:
@@ -364,11 +396,5 @@ class Launcher(QWidget):
     def show_csv_file_open_dialog(self, caption) -> Path | None:
         path_str, _ = QFileDialog.getOpenFileName(
             self, caption, "", "CSV Files (*.csv)"
-        )
-        return Path(path_str) if path_str else None
-
-    def show_sim_file_open_dialog(self, caption) -> Path | None:
-        path_str, _ = QFileDialog.getOpenFileName(
-            self, caption, "", "Simulation data (*.csv *.nbody)"
         )
         return Path(path_str) if path_str else None

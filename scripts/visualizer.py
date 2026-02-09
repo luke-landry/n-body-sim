@@ -241,6 +241,7 @@ if __name__ == "__main__":
             else VisualizerConfig()
         )
         visualizer = Visualizer(data, config)
+        print("LOADED", flush=True)  # flushing to immediately print to stdout
         visualizer.show()
         sys.exit(app.exec())
     except Exception as e:

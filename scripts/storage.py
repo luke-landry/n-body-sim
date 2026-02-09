@@ -96,7 +96,7 @@ def load_visualizer_config_from_json(path: Path) -> VisualizerConfig:
     if not path.exists():
         raise FileNotFoundError(f"The config data file {path} does not exist")
 
-    with open(path, "r") as f:
+    with path.open("r", encoding="utf-8") as f:
         data = json.load(f)
         if isinstance(data, dict):
             data = data.get("visualizer_config", {})

@@ -18,6 +18,7 @@ This project implements an N-body simulator that models the gravitational intera
 ### Linux
 1. Download and extract the latest Linux release tarball
 2. Run `install.sh` to setup the virtual environment and install required packages (first time only)
+    - On Debian/Ubuntu, you may need to install `python3-venv` with `sudo apt install python3-venv` before running the install script
 3. Run `run.sh` to start the application
 
 ## GUI Usage
@@ -32,6 +33,11 @@ The launcher allows you to configure simulation parameters and body initial cond
 - **Launch Simulation**: Start the physics simulation with your configured parameters and automatically display the visualization when complete
 - **Simulate Only**: Run the physics simulation without displaying the visualization. Prompts you to select a directory to save the results
 - **View Simulation**: Load and display the visualization of previously saved simulation results from a selected directory
+
+**Note:** The launcher expects these specific file names in selected directories when loading/saving configurations and simulation data:
+- `initial_conditions.csv` for body initial conditions
+- `config.json` for launcher configuration
+- `output.csv` or `output.nbody` for simulation output data
 
 ### Visualizer
 

@@ -1,20 +1,23 @@
+from functools import partial
 from pathlib import Path
 
 import storage
-from launcher import Launcher
+from launcher import (
+    CONFIG_FILENAME,
+    INITIAL_CONDITIONS_FILENAME,
+    OUTPUT_FILENAME,
+    Launcher,
+)
 from PySide6.QtWidgets import QApplication, QMessageBox
 from runners import Runner, SimulationRunner, VisualizerRunner
 from schema import BodyConfig, SimulationParameters, VisualizerConfig
-
-INITIAL_CONDITIONS_FILENAME = "initial_conditions.csv"
-CONFIG_FILENAME = "config.json"
-OUTPUT_FILENAME = "output.csv"
 
 
 class Controller:
     def __init__(self) -> None:
         self.app = QApplication()
         self.runners: list[Runner] = []
+        self.runner_metadata: dict[Runner, dict] = {}
 
         self.launcher: Launcher = Launcher()
         self.launcher.run_sim.connect(self.run_sim)
@@ -27,11 +30,11 @@ class Controller:
 
     def run_sim(
         self,
-        path: Path,  # directory path
-        sim_parameters: SimulationParameters,  # simulation parameters
-        bodies: list[BodyConfig],  # body configs
-        visualizer_config: VisualizerConfig,  # visualizer config
-        run_visualizer: bool,  # auto-run the visualizer afterwards
+        path: Path,
+        sim_parameters: SimulationParameters,
+        bodies: list[BodyConfig],
+        visualizer_config: VisualizerConfig,
+        run_visualizer: bool,
     ):
         ic_path = path / INITIAL_CONDITIONS_FILENAME
         config_path = path / CONFIG_FILENAME
@@ -46,41 +49,39 @@ class Controller:
             return
 
         runner = SimulationRunner(ic_path, output_path, sim_parameters)
-        runner.finished.connect(
-            lambda r=runner, v=run_visualizer, p=path: self.handle_simulation_finished(
-                r, v, p
-            )
-        )
-        runner.error.connect(self.on_simulation_error)
+        runner.finished.connect(partial(self.handle_runner_finished, runner))
+        runner.error.connect(self.handle_runner_error)
         self.runners.append(runner)
+        self.runner_metadata[runner] = {
+            "run_visualizer": run_visualizer,
+            "path": path,
+        }
         runner.start()
-
-    def handle_simulation_finished(self, runner, run_visualizer, path: Path):
-        if runner in self.runners:
-            self.runners.remove(runner)
-        runner.deleteLater()
-        if run_visualizer:
-            self.view_sim(path)
 
     def view_sim(self, path: Path):
         config_path = path / CONFIG_FILENAME
         output_path = path / OUTPUT_FILENAME
         runner = VisualizerRunner(output_path, config_path)
-        runner.finished.connect(lambda r=runner: self.handle_visualizer_finished(r))
-        runner.error.connect(self.on_visualizer_error)
+        runner.finished.connect(partial(self.handle_runner_finished, runner))
+        runner.error.connect(self.handle_runner_error)
         self.runners.append(runner)
         runner.start()
 
-    def handle_visualizer_finished(self, runner):
+    def handle_runner_finished(self, runner: Runner, exit_code: int):
+        self.cleanup_runner(runner)
+        meta = self.runner_metadata.pop(runner, {})
+        run_visualizer = meta.get("run_visualizer", False)
+        path = meta.get("path", None)
+        if run_visualizer and path and exit_code == 0:
+            self.view_sim(path)
+
+    def handle_runner_error(self, message: str):
+        self.show_error_dialog(message)
+
+    def cleanup_runner(self, runner: Runner) -> None:
         if runner in self.runners:
             self.runners.remove(runner)
         runner.deleteLater()
-
-    def on_simulation_error(self, message: str):
-        self.show_error_dialog(message)
-
-    def on_visualizer_error(self, message: str):
-        self.show_error_dialog(message)
 
     def show_error_dialog(self, message):
         print(f"Error: {message}")

@@ -64,7 +64,7 @@ def generate_single_star_system(
         cos_omega = np.cos(omega)
         sin_omega = np.sin(omega)
 
-        # define 3D rotation matrices
+        # 3D rotation matrices
         Rx = np.array(
             [[1.0, 0.0, 0.0], [0.0, cos_inc, -sin_inc], [0.0, sin_inc, cos_inc]]
         )
