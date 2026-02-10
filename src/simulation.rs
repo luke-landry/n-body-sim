@@ -10,12 +10,7 @@ pub struct Body {
 }
 
 impl Body {
-    pub fn new(
-        id: usize,
-        mass: f64,
-        position: DVec3,
-        velocity: DVec3,
-    ) -> Self {
+    pub fn new(id: usize, mass: f64, position: DVec3, velocity: DVec3) -> Self {
         Self {
             id,
             mass,
@@ -92,8 +87,11 @@ impl Simulator {
         let mut time = 0.0;
         for _ in 0..self.parameters.num_steps {
             record_state(&self.bodies, time);
-            self.integrator
-                .step(&mut self.bodies, self.parameters.time_step, &mut accelerations);
+            self.integrator.step(
+                &mut self.bodies,
+                self.parameters.time_step,
+                &mut accelerations,
+            );
             time += self.parameters.time_step;
         }
 

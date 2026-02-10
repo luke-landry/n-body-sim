@@ -88,7 +88,7 @@ impl NewtonGravity {
     can be written as
         a_i = k * m_j * r
         a_j = k * m_i * r
-    and simplified to 
+    and simplified to
         a_i = (k * r) * m_j
         a_j = (k * r)* m_i
 */
@@ -105,7 +105,7 @@ impl Gravity for NewtonGravity {
                 let r = bodies[j].position - bodies[i].position;
                 let k = g / ((r.length_squared() + epsilon_squared).powf(1.5));
                 let kr = k * r;
-                
+
                 accelerations[i] += kr * m_j;
                 accelerations[j] -= kr * m_i;
             }

@@ -1,6 +1,6 @@
 use glam::DVec3;
 
-use crate::{Integrator, gravity::Gravity, simulation::Body};
+use crate::{gravity::Gravity, integrators::Integrator, simulation::Body};
 
 pub struct EulerIntegrator {
     gravity: Box<dyn Gravity>,
