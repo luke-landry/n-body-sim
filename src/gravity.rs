@@ -4,6 +4,7 @@ use crate::simulation::Body;
 
 pub mod barnes_hut;
 pub mod newton;
+pub mod newton_parallel;
 
 pub trait Gravity {
     /// Writes accelerations into output parameter instead of returning a vec to avoid

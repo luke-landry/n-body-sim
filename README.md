@@ -69,7 +69,7 @@ The Rust physics engine can also be run independently without installing Python 
 - `-n, --num-steps <NUM_STEPS>`: Number of time steps to simulate
 - `--softening-factor <SOFTENING_FACTOR>`: The softening factor to avoid numerical instability as distances approach zero
 - `--theta <THETA>`: Theta value for Barnes-Hut gravity calculation method
-- `--gravity <GRAVITY>`: Gravity calculation method: `newton` (more to be added)
+- `--gravity <GRAVITY>`: Gravity calculation method: `newton`, `newton-parallel` (more to be added)
 - `--integrator <INTEGRATOR>`: Integration method: `euler` (more to be added)
 - `-h, --help`: Print help
 
@@ -194,17 +194,18 @@ A larger $\epsilon$ increases numerical stability by smoothing out interactions,
 
 ## Build
 
-### Using the VS Code Dev Containers extension
-1. In VS Code, install the "Dev Containers" extension and then open this project
-2. Launch the development container by following by selecting the `Reopen in Container` option in the Dev Containers notification, or use the `>Dev Containers: Rebuild and Reopen in Container` command in the command palette.
-3. Run `cargo build` in the VS Code terminal
+### Container Setup
+#### **Using Dev Containers**
+1. Launch the project in a dev container from your code editor using the configuration in `.devcontainer/devcontainer.json`
 
-### Manually with Docker installed
+#### **Manually with Docker installed**
 1. Build the development image with `docker build -t n-body-sim .`
 2. Run the development container with 
     - Linux (bash): `docker run -dit -v $(pwd):/home/dev/n-body-sim --name n-body-sim n-body-sim`
     - Windows (PS): `docker run -dit -v ${PWD}:/home/dev/n-body-sim --name n-body-sim n-body-sim`
 3. Enter the container with `docker exec -it n-body-sim bash`
-4. In the container, build the binary for Linux or .exe for Windows by running
-    - Linux: `cargo build`
-    - Windows: `cargo build --target x86_64-pc-windows-gnu`
+
+
+### Build Physics Engine Executable
+  - Linux: `cargo build`
+  - Windows: `cargo build --target x86_64-pc-windows-gnu`

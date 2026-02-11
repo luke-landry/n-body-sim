@@ -19,7 +19,7 @@ class SimulationParameters(BaseModel):
     num_steps: PositiveInt = 10000
     softening_factor: float = 0.05
     theta: PositiveFloat = 0.5
-    gravity: Literal["newton"] = "newton"
+    gravity: Literal["newton", "newton-parallel"] = "newton"
     integrator: Literal["euler"] = "euler"
 
 

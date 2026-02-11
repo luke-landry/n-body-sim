@@ -1,5 +1,8 @@
 use crate::constants;
-use crate::gravity::{Gravity, barnes_hut::BarnesHutGravity, newton::NewtonGravity};
+use crate::gravity::{
+    Gravity, barnes_hut::BarnesHutGravity, newton::NewtonGravity,
+    newton_parallel::NewtonParallelGravity,
+};
 use crate::integrators::{
     Integrator, euler::EulerIntegrator, velocity_verlet::VelocityVerletIntegrator,
 };
@@ -49,6 +52,7 @@ pub struct Args {
 #[derive(Clone, ValueEnum)]
 pub enum GravityMethod {
     Newton,
+    NewtonParallel,
     BarnesHut,
 }
 
@@ -56,6 +60,10 @@ impl GravityMethod {
     pub fn create(&self, parameters: &Parameters) -> Box<dyn Gravity> {
         match self {
             GravityMethod::Newton => Box::new(NewtonGravity::new(
+                parameters.g_constant,
+                parameters.softening_factor,
+            )),
+            GravityMethod::NewtonParallel => Box::new(NewtonParallelGravity::new(
                 parameters.g_constant,
                 parameters.softening_factor,
             )),
