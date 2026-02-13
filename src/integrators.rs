@@ -1,5 +1,3 @@
-use glam::DVec3;
-
 use crate::simulation::Body;
 
 pub mod euler;

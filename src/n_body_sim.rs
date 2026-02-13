@@ -5,39 +5,45 @@ use crate::simulation::{Parameters, Simulator};
 use clap::Parser;
 use std::error::Error;
 
-pub fn run() -> Result<(), Box<dyn Error>> {
-    println!("n-body-sim");
+pub struct NBodySim {
+    args: Args,
+    simulator: Simulator,
+}
 
-    let args = Args::parse();
+impl NBodySim {
+    pub fn new() -> Result<Self, Box<dyn Error>> {
+        let args = Args::parse();
+        let bodies = input::load_bodies(&args.initial_conditions_path)?;
+        let parameters = Parameters::new(
+            args.time_step,
+            args.num_steps,
+            args.g_constant,
+            args.softening_factor,
+            args.theta,
+        );
 
-    let bodies = input::load_bodies(&args.initial_conditions_path)?;
+        let gravity = args.gravity.create(&parameters);
+        let integrator = args
+            .integrator
+            .create(gravity, parameters.time_step, bodies.len());
 
-    let parameters = Parameters::new(
-        args.time_step,
-        args.num_steps,
-        args.g_constant,
-        args.softening_factor,
-        args.theta,
-    );
+        let simulator = Simulator::new(bodies, parameters, integrator);
 
-    let gravity = args.gravity.create(&parameters);
-
-    let integrator = args
-        .integrator
-        .create(gravity, parameters.time_step, bodies.len());
-
-    let mut simulator = Simulator::new(bodies, parameters, integrator);
-
-    let data = simulator.run();
-
-    match args.output_data_path {
-        Some(path) => {
-            output::save_to_csv(&path, data)?;
-        }
-        None => {
-            output::print_data(data);
-        }
+        Ok(Self { args, simulator })
     }
 
-    Ok(())
+    pub fn run(self) -> Result<(), Box<dyn Error>> {
+        let mut simulator = self.simulator;
+        let data = simulator.run();
+        match self.args.output_data_path {
+            Some(path) => {
+                output::save_to_csv(&path, data)?;
+            }
+            None => {
+                output::print_data(data);
+            }
+        }
+
+        Ok(())
+    }
 }

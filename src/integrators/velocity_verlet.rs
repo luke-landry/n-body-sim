@@ -36,7 +36,7 @@ impl VelocityVerletIntegrator {
     to update the position, and then using the new acceleration (a_n) to update the velocity.
     This allows it to capture the motion of the system more accurately than first-order methods.
 
-    However, by combining the velocity half steps (steps 2 and 5), we can get a simplified
+    By combining the velocity half steps (steps 2 and 5), we can get a simplified
     version of the algorithm that only requires 3 steps. This is only possible when
     acceleration is based solely on position, which is the case for gravitational forces.
 

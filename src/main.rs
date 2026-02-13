@@ -7,8 +7,10 @@ mod n_body_sim;
 mod output;
 mod simulation;
 
+use crate::n_body_sim::NBodySim;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    n_body_sim::run()
+    let sim = NBodySim::new()?;
+    sim.run()
 }
