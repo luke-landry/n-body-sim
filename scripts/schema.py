@@ -20,7 +20,7 @@ class SimulationParameters(BaseModel):
     softening_factor: float = 0.05
     theta: PositiveFloat = 0.5
     gravity: Literal["newton", "newton-parallel"] = "newton"
-    integrator: Literal["euler"] = "euler"
+    integrator: Literal["euler", "velocity-verlet"] = "euler"
 
 
 class VisualizerConfig(BaseModel):

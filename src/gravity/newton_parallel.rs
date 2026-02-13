@@ -27,11 +27,14 @@ impl NewtonParallelGravity {
         k = G / (r^2 + ε^2)^(3/2)
 
     To parallelize the calculations, we can use par_iter from the rayon library, which
-    will divide the work of calculating accelerations for each body across multiple threads.
+    will divide the work of calculating accelerations for each body using a thread pool.
     To keep each calculation independent so that it can be computed in parallel, the "trick"
     using Newton's third law that allows partially updating the acceleration of body j while
-    calculating the acceleration of body i cannot be used here, and the loop will have to
-    iterate N^2 times. However, the overall performance should still improve due to parallelization.
+    calculating the acceleration of body i to reduce the number of iterations cannot be used
+    here because multiple threads may try to update the same acceleration value at the exact
+    same time. So, the loop will have to iterate N^2 times, however the overall performance
+    should still be relatively improved for larger N due to the parallelization of the
+    calculations across multiple threads.
 */
 impl Gravity for NewtonParallelGravity {
     fn calculate_accelerations(&self, bodies: &[Body], accelerations: &mut [DVec3]) {

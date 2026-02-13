@@ -4,11 +4,17 @@ use crate::{gravity::Gravity, integrators::Integrator, simulation::Body};
 
 pub struct EulerIntegrator {
     gravity: Box<dyn Gravity>,
+    time_step: f64,
+    accelerations: Vec<DVec3>,
 }
 
 impl EulerIntegrator {
-    pub fn new(gravity: Box<dyn Gravity>) -> Self {
-        EulerIntegrator { gravity }
+    pub fn new(gravity: Box<dyn Gravity>, time_step: f64, num_bodies: usize) -> Self {
+        EulerIntegrator {
+            gravity,
+            time_step,
+            accelerations: vec![DVec3::ZERO; num_bodies],
+        }
     }
 }
 
@@ -18,8 +24,9 @@ impl EulerIntegrator {
     Let dt be the time step
 
     The standard Euler method would be as follows:
-        1. r_n = r + v*dt
-        2. v_n = v + a*dt
+        1. a = compute_acceleration(r)
+        2. r_n = r + v*dt
+        3. v_n = v + a*dt
 
     Next position is calculated first, then next velocity. This means current
     acceleration is not taken into account for position updates, which makes simulations
@@ -31,8 +38,9 @@ impl EulerIntegrator {
     artificial energy, causing the orbiting body to spiral outward forever.
 
     To avoid this, we use the semi-implicit Euler method:
-        1. v_n = v + a*dt
-        2. r_n = r + v_n*dt
+        1. a = compute_acceleration(r)
+        2. v_n = v + a*dt
+        3. r_n = r + v_n*dt
 
     New velocity is calculated first, then the next position is calculated using the
     next velocity. This sequence takes into account the current acceleration when
@@ -43,12 +51,13 @@ impl EulerIntegrator {
     energy from drifting away over time.
 */
 impl Integrator for EulerIntegrator {
-    fn step(&self, bodies: &mut [Body], time_step: f64, accelerations: &mut [DVec3]) {
-        accelerations.fill(DVec3::ZERO);
-        self.gravity.calculate_accelerations(bodies, accelerations);
-        for i in 0..bodies.len() {
-            bodies[i].velocity += accelerations[i] * time_step;
-            bodies[i].position += bodies[i].velocity * time_step;
+    fn step(&mut self, bodies: &mut [Body]) {
+        self.accelerations.fill(DVec3::ZERO);
+        self.gravity
+            .calculate_accelerations(bodies, &mut self.accelerations);
+        for (i, body) in bodies.iter_mut().enumerate() {
+            body.velocity += self.accelerations[i] * self.time_step;
+            body.position += body.velocity * self.time_step;
         }
     }
 }

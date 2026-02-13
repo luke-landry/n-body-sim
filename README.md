@@ -167,15 +167,17 @@ For 3+ bodies, the system generally becomes chaotic, which means it is highly se
 
 #### **Integrators**
 Integrators are algorithms that update the position and velocity of each body at every time step.
-- **Semi-implicit Euler**: A first-order symplectic integrator. It is efficient but less precise over long durations.
-- **Velocity Verlet (*planned*)**: A second-order symplectic integrator that provides a higher degree of precision by calculating positions and velocities at multiple points within the time step
+- **Semi-implicit Euler**: A first-order symplectic integrator modified from the non-symplectic standard Euler method. It is simple and efficient but not the most accurate.
+- **Velocity Verlet**: A second-order symplectic integrator that provides improved accuracy by evaluating accelerations at the beginning and end of each time step and using both to update positions and velocities.
+- **Runge-Kutta (*planned*)**: The fourth-order Runge-Kutta method (RK4) is a non-symplectic integrator that achieves high accuracy by evaluating derivatives at four distinct points within each time step and combining them in a weighted average to update the state.
 
-The integrators used in this project are symplectic. In non-symplectic integrators, such as the standard Euler or Runge-Kutta methods, numerical rounding errors accumulate, causing the system to gain or lose energy over time (e.g., planets spiraling into the sun). Symplectic integrators keep these energy errors bounded, ensuring that orbits remain stable over long simulation periods.
+
+In non-symplectic integrators, such as the standard Euler or Runge-Kutta methods, numerical rounding errors accumulate, causing the system to gain or lose energy over time (e.g., planets spiraling into the sun). Symplectic integrators keep these energy errors bounded, ensuring that orbits remain stable over long simulation periods. Symplectic integrators are generally more accurate for long-term simulations while non-symplectic higher-order integrators may be preferred for short-term accuracy.
 
 #### **Gravity**
 These algorithms calculate the gravitational forces exerted on each body.
 - **Newtonian**: Calculates the force between every pair of bodies directly. This is perfectly accurate but slow for large systems, with a time complexity of $O(n^2)$.
-- **Barnes-Hut (*planned*)**: An algorithm used for large-scale simulation (e.g. galaxies). It organizes bodies into a tree structure, treating distant groups of objects as a single combined mass. This introduces a small approximation error but significantly improves performance to $O(n\ log\ n)$.
+- **Barnes-Hut (*planned*)**: An algorithm used for large-scale simulation (e.g. galaxies). It organizes bodies into an octree, treating distant groups of objects as a single combined mass. This introduces a small approximation error but significantly improves performance to $O(n\ log\ n)$.
 
 #### **Softening Factor**
 Gravitational force is calculated using Newton's Law of Universal Gravitation:

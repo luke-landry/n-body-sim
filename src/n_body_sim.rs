@@ -22,7 +22,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 
     let gravity = args.gravity.create(&parameters);
 
-    let integrator = args.integrator.create(gravity);
+    let integrator = args
+        .integrator
+        .create(gravity, parameters.time_step, bodies.len());
 
     let mut simulator = Simulator::new(bodies, parameters, integrator);
 

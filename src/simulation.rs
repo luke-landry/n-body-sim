@@ -75,23 +75,14 @@ impl Simulator {
         // Precompute total results size to avoid memory reallocations
         let num_results = self.bodies.len() * (self.parameters.num_steps + 1);
         let mut data: Vec<BodySnapshot> = Vec::with_capacity(num_results);
-
-        // Accelerations is allocated at sim top level so that it does not
-        // need to be heap allocated on every step
-        let mut accelerations = vec![DVec3::ZERO; self.bodies.len()];
-
+        let mut time = 0.0;
         let mut record_state = |bodies: &[Body], time: f64| {
             data.extend(bodies.iter().map(|body| BodySnapshot::create(body, time)));
         };
 
-        let mut time = 0.0;
         for _ in 0..self.parameters.num_steps {
             record_state(&self.bodies, time);
-            self.integrator.step(
-                &mut self.bodies,
-                self.parameters.time_step,
-                &mut accelerations,
-            );
+            self.integrator.step(&mut self.bodies);
             time += self.parameters.time_step;
         }
 
