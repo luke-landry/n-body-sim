@@ -2,6 +2,7 @@ use crate::integrators::Integrator;
 use crate::output::BodySnapshot;
 use glam::DVec3;
 
+#[derive(Clone)]
 pub struct Body {
     pub id: usize,
     pub mass: f64,

@@ -1,6 +1,7 @@
 use crate::simulation::Body;
 
 pub mod euler;
+pub mod runge_kutta;
 pub mod velocity_verlet;
 
 pub trait Integrator {

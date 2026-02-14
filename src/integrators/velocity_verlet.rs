@@ -21,19 +21,19 @@ impl VelocityVerletIntegrator {
 }
 
 /*
-    Let r, v, a, be current position, velocity, and acceleration, respectively
-    Let r_n, v_n, a_n, be the next position, velocity, and acceleration, respectively
+    Let r_n, v_n, a_n be the current position, velocity, and acceleration, respectively
+    Let r_(n+1), v_(n+1), a_(n+1) be the next position, velocity, and acceleration, respectively
     Let dt be the time step
 
     The standard velocity verlet algorithm is as follows:
-        1. a = compute_acceleration(r)
-        2. v_half = v + (0.5 * a * dt)
-        3. r_n = r + (v_half * dt)
-        4. a_n = compute_acceleration(r_n)
-        5. v_n = v_half + (0.5 * a_n * dt)
+        1. a_n = compute_acceleration(r_n)
+        2. v_half = v_n + (0.5 * a_n * dt)
+        3. r_(n+1) = r_n + (v_half * dt)
+        4. a_(n+1) = compute_acceleration(r_(n+1))
+        5. v_(n+1) = v_half + (0.5 * a_(n+1) * dt)
 
     It achieves second-order accuracy by using the velocity at the half time step (v_half)
-    to update the position, and then using the new acceleration (a_n) to update the velocity.
+    to update the position, and then using the new acceleration (a_(n+1)) to update the velocity.
     This allows it to capture the motion of the system more accurately than first-order methods.
 
     By combining the velocity half steps (steps 2 and 5), we can get a simplified
@@ -41,10 +41,10 @@ impl VelocityVerletIntegrator {
     acceleration is based solely on position, which is the case for gravitational forces.
 
     The simplified Velocity Verlet algorithm consists of the following steps:
-        1. a = compute_acceleration(r)
-        2. r_n = r + (v * dt) + (0.5 * a * dt^2)
-        3. a_n = compute_acceleration(r_n)
-        4. v_n = v + (0.5 * (a + a_n) * dt)
+        1. a_n = compute_acceleration(r_n)
+        2. r_(n+1) = r_n + (v_n * dt) + (0.5 * a_n * dt^2)
+        3. a_(n+1) = compute_acceleration(r_(n+1))
+        4. v_(n+1) = v_n + (0.5 * (a_n + a_(n+1)) * dt)
 
     The Velocity Verlet algorithm is a symplectic integrator, so it will conserve energy better
     than non-symplectic integrators. It is also a second-order method, which means it is more
@@ -53,8 +53,10 @@ impl VelocityVerletIntegrator {
 */
 impl Integrator for VelocityVerletIntegrator {
     fn step(&mut self, bodies: &mut [Body]) {
-        // Calculate the current intermediate accelerations based on the current positions of the bodies
         self.accelerations_current.fill(DVec3::ZERO);
+        self.accelerations_next.fill(DVec3::ZERO);
+
+        // Calculate the current intermediate accelerations based on the current positions of the bodies
         self.gravity
             .calculate_accelerations(bodies, &mut self.accelerations_current);
 
@@ -64,7 +66,6 @@ impl Integrator for VelocityVerletIntegrator {
         }
 
         // The next accelerations vector will store the accelerations after the position update
-        self.accelerations_next.fill(DVec3::ZERO);
         self.gravity
             .calculate_accelerations(bodies, &mut self.accelerations_next);
 

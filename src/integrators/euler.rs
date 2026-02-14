@@ -19,14 +19,14 @@ impl EulerIntegrator {
 }
 
 /*
-    Let r, v, a, be current position, velocity, and acceleration, respectively
-    Let r_n, v_n, a_n, be the next position, velocity, and acceleration, respectively
+    Let r_n, v_n, a_n be the current position, velocity, and acceleration, respectively
+    Let r_(n+1), v_(n+1), a_(n+1) be the next position, velocity, and acceleration, respectively
     Let dt be the time step
 
     The standard Euler method would be as follows:
-        1. a = compute_acceleration(r)
-        2. r_n = r + v*dt
-        3. v_n = v + a*dt
+        1. a_n = compute_acceleration(r_n)
+        2. r_(n+1) = r_n + v_n * dt
+        3. v_(n+1) = v_n + a_n * dt
 
     Next position is calculated first, then next velocity. This means current
     acceleration is not taken into account for position updates, which makes simulations
@@ -38,9 +38,9 @@ impl EulerIntegrator {
     artificial energy, causing the orbiting body to spiral outward forever.
 
     To avoid this, we use the semi-implicit Euler method:
-        1. a = compute_acceleration(r)
-        2. v_n = v + a*dt
-        3. r_n = r + v_n*dt
+        1. a_n = compute_acceleration(r_n)
+        2. v_(n+1) = v_n + a_n * dt
+        3. r_(n+1) = r_n + v_(n+1) * dt
 
     New velocity is calculated first, then the next position is calculated using the
     next velocity. This sequence takes into account the current acceleration when
