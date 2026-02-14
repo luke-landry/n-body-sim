@@ -2,6 +2,10 @@
 /// https://physics.nist.gov/cgi-bin/cuu/Value?bg
 // pub const G: f64 = 6.67430e-11; // m^3 kg^-1 s^-2
 
+pub const DEFAULT_INITIAL_CONDITIONS_PATH: &str = "initial_conditions.csv";
+
+pub const DEFAULT_OUTPUT_PATH: &str = "output.txt";
+
 pub const DEFAULT_G: f64 = 1.0;
 
 pub const DEFAULT_TIMESTEP: f64 = 0.01;

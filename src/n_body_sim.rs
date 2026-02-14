@@ -11,8 +11,7 @@ pub struct NBodySim {
 }
 
 impl NBodySim {
-    pub fn new() -> Result<Self, Box<dyn Error>> {
-        let args = Args::parse();
+    pub fn new(args: Args) -> Result<Self, Box<dyn Error>> {
         let bodies = input::load_bodies(&args.initial_conditions_path)?;
         let parameters = Parameters::new(
             args.time_step,

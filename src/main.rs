@@ -1,3 +1,4 @@
+mod benchmark;
 mod cli;
 mod constants;
 mod gravity;
@@ -7,10 +8,18 @@ mod n_body_sim;
 mod output;
 mod simulation;
 
+use crate::cli::Args;
 use crate::n_body_sim::NBodySim;
+use clap::Parser;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let sim = NBodySim::new()?;
+    let args = Args::parse();
+
+    if args.benchmark {
+        return benchmark::run_benchmark();
+    }
+
+    let sim = NBodySim::new(args)?;
     sim.run()
 }

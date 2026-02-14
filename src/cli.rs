@@ -13,11 +13,11 @@ use std::path::PathBuf;
 #[derive(Parser)]
 pub struct Args {
     /// Path to CSV file containing initial conditions for each body
-    #[arg(short, long)]
+    #[arg(short, long, default_value = constants::DEFAULT_INITIAL_CONDITIONS_PATH)]
     pub initial_conditions_path: PathBuf,
 
     /// Path to CSV file to save simulation output data (prints to stdout if none provided)
-    #[arg(short, long)]
+    #[arg(short, long, default_value = constants::DEFAULT_OUTPUT_PATH)]
     pub output_data_path: Option<PathBuf>,
 
     /// The gravitional constant to use in gravitational force calculations
@@ -51,9 +51,13 @@ pub struct Args {
     /// Flag to enable progress output to stdout
     #[arg(long)]
     pub progress: bool,
+
+    /// Flag to run benchmarks (will ignore other parameters)
+    #[arg(long)]
+    pub benchmark: bool,
 }
 
-#[derive(Clone, ValueEnum)]
+#[derive(Copy, Clone, Debug, ValueEnum)]
 pub enum GravityMethod {
     Newton,
     NewtonParallel,
@@ -80,7 +84,7 @@ impl GravityMethod {
     }
 }
 
-#[derive(Clone, ValueEnum)]
+#[derive(Copy, Clone, Debug, ValueEnum)]
 pub enum IntegratorMethod {
     Euler,
     VelocityVerlet,
