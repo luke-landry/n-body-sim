@@ -21,6 +21,7 @@ class SimulationParameters(BaseModel):
     theta: PositiveFloat = 0.5
     gravity: Literal["newton", "newton-parallel"] = "newton"
     integrator: Literal["euler", "velocity-verlet"] = "euler"
+    progress: bool = False
 
 
 class VisualizerConfig(BaseModel):

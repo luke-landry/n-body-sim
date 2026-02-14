@@ -47,6 +47,10 @@ pub struct Args {
     /// Integrator for computing next-step state
     #[arg(long, default_value = constants::DEFAULT_INTEGRATOR)]
     pub integrator: IntegratorMethod,
+
+    /// Flag to enable progress output to stdout
+    #[arg(long)]
+    pub progress: bool,
 }
 
 #[derive(Clone, ValueEnum)]

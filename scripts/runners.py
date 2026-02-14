@@ -110,16 +110,38 @@ class SimulationRunner(Runner):
             sim_parameters.gravity,
             "--integrator",
             sim_parameters.integrator,
+            "--progress",
         ]
         super().__init__(
             program=program,
             args=args,
             dialog_title="Running Simulation",
-            dialog_label="Simulation running. This may take a while...",
+            dialog_label="Simulation running...",
         )
 
+    def create_loading_dialog(self, title: str, label: str) -> QProgressDialog:
+        dialog = super().create_loading_dialog(title, label)
+        dialog.setMinimum(0)
+        dialog.setMaximum(100)
+        return dialog
+
     def on_process_output(self) -> None:
-        pass  # TODO implement progress output
+        if self.process:
+            output = self.process.readAllStandardOutput().data().decode()
+            for line in output.splitlines():
+                stripped = line.strip()
+                try:
+                    # try to parse progress as integer percentage
+                    progress = int(stripped)
+                    if self.loading_dialog and 0 <= progress <= 99:
+                        self.loading_dialog.setValue(progress)
+                        if progress == 99:
+                            print("Simulation completed successfully.")
+                            self.loading_dialog.setLabelText("Finalizing...")
+                        continue
+                except ValueError:
+                    pass
+                print(line)
 
 
 # Note: Launching visualizer.py as a subprocess rather than importing and running the Visualizer class directly

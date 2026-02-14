@@ -25,11 +25,16 @@ pub fn load_bodies(path: &Path) -> Result<Vec<Body>, Box<dyn Error>> {
         .enumerate()
         .map(|(id, result)| {
             result.map(|ic| {
-                println!(
-                    "read body #{:0>4} | Mass: {:>12e} | Pos: ({:>12e}, {:>12e}, {:>12e}) | Vel: ({:>12e}, {:>12e}, {:>12e}) |",
-                    id, ic.mass, ic.pos_x, ic.pos_y, ic.pos_z, ic.vel_x, ic.vel_y, ic.vel_z
-                );
-                Body::new(id, ic.mass, DVec3::new(ic.pos_x, ic.pos_y, ic.pos_z), DVec3::new(ic.vel_x, ic.vel_y, ic.vel_z))
+                // println!(
+                //     "read body #{:0>4} | Mass: {:>12e} | Pos: ({:>12e}, {:>12e}, {:>12e}) | Vel: ({:>12e}, {:>12e}, {:>12e}) |",
+                //     id, ic.mass, ic.pos_x, ic.pos_y, ic.pos_z, ic.vel_x, ic.vel_y, ic.vel_z
+                // );
+                Body::new(
+                    id,
+                    ic.mass,
+                    DVec3::new(ic.pos_x, ic.pos_y, ic.pos_z),
+                    DVec3::new(ic.vel_x, ic.vel_y, ic.vel_z),
+                )
             })
         })
         .collect::<Result<Vec<Body>, _>>()

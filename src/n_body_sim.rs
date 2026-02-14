@@ -20,6 +20,7 @@ impl NBodySim {
             args.g_constant,
             args.softening_factor,
             args.theta,
+            args.progress,
         );
 
         let gravity = args.gravity.create(&parameters);
