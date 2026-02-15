@@ -1,4 +1,8 @@
 use crate::gravity::Gravity;
+use rayon::prelude::*;
+// This module uses the similarly named barnes_hut crate by
+// David-OConnor for the Barnes-Hut algorithm implementation
+use barnes_hut::{self, BhConfig, Tree};
 
 pub struct BarnesHutGravity {
     g_constant: f64,
