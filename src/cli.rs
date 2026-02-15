@@ -109,6 +109,7 @@ impl GravityMethod {
 pub enum IntegratorMethod {
     Euler,
     VelocityVerlet,
+    RungeKutta,
 }
 
 impl IntegratorMethod {
@@ -125,6 +126,11 @@ impl IntegratorMethod {
             IntegratorMethod::VelocityVerlet => Box::new(VelocityVerletIntegrator::new(
                 gravity, time_step, num_bodies,
             )),
+            IntegratorMethod::RungeKutta => {
+                Box::new(crate::integrators::runge_kutta::RungeKuttaIntegrator::new(
+                    gravity, time_step, num_bodies,
+                ))
+            }
         }
     }
 }

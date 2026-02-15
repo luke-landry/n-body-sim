@@ -1,7 +1,4 @@
-use crate::{gravity::Accelerations, simulation::Bodies};
-use glam::DVec3;
-
-use crate::{gravity::Gravity, simulation::Body};
+use crate::gravity::Gravity;
 
 pub struct BarnesHutGravity {
     g_constant: f64,
@@ -20,7 +17,16 @@ impl BarnesHutGravity {
 }
 
 impl Gravity for BarnesHutGravity {
-    fn calculate_accelerations(&self, bodies: &Bodies, accelerations: &mut Accelerations) {
+    fn calculate_accelerations(
+        &self,
+        masses: &[f64],
+        rx: &[f64],
+        ry: &[f64],
+        rz: &[f64],
+        ax: &mut [f64],
+        ay: &mut [f64],
+        az: &mut [f64],
+    ) {
         // to be implemented
     }
 }

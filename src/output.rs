@@ -1,6 +1,6 @@
 use std::{fmt, path::Path};
 
-use crate::simulation::{Bodies, Body};
+use crate::simulation::Bodies;
 use csv::Writer;
 use serde::Serialize;
 
@@ -11,18 +11,6 @@ pub struct BodySnapshot {
     x: f64,
     y: f64,
     z: f64,
-}
-
-impl BodySnapshot {
-    pub fn create(body: &Body, time: f64) -> Self {
-        BodySnapshot {
-            time,
-            id: body.id,
-            x: body.position.x,
-            y: body.position.y,
-            z: body.position.z,
-        }
-    }
 }
 
 impl fmt::Display for BodySnapshot {

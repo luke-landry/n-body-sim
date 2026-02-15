@@ -1,6 +1,5 @@
+use crate::gravity::Gravity;
 use crate::gravity::newton::compute_acceleration_for_body;
-use crate::gravity::{Accelerations, Gravity};
-use crate::simulation::Bodies;
 use rayon::prelude::*;
 
 pub struct NewtonParallelGravity {
@@ -30,25 +29,27 @@ impl NewtonParallelGravity {
     will divide the work of calculating accelerations for each body using a thread pool.
 */
 impl Gravity for NewtonParallelGravity {
-    fn calculate_accelerations(&self, bodies: &Bodies, accelerations: &mut Accelerations) {
-        let n = bodies.len();
+    fn calculate_accelerations(
+        &self,
+        masses: &[f64],
+        rx: &[f64],
+        ry: &[f64],
+        rz: &[f64],
+        ax: &mut [f64],
+        ay: &mut [f64],
+        az: &mut [f64],
+    ) {
+        let n = masses.len();
         let g = self.g_constant;
         let eps2 = self.softening_factor.powi(2);
 
-        let m = &bodies.masses;
-
-        let rx = &bodies.pos_x;
-        let ry = &bodies.pos_y;
-        let rz = &bodies.pos_z;
-
-        accelerations
-            .ax
-            .par_iter_mut()
-            .zip(accelerations.ay.par_iter_mut())
-            .zip(accelerations.az.par_iter_mut())
+        ax.par_iter_mut()
+            .zip(ay.par_iter_mut())
+            .zip(az.par_iter_mut())
             .enumerate()
             .for_each(|(i, ((ax_i, ay_i), az_i))| {
-                (*ax_i, *ay_i, *az_i) = compute_acceleration_for_body(i, n, g, eps2, m, rx, ry, rz);
+                (*ax_i, *ay_i, *az_i) =
+                    compute_acceleration_for_body(i, n, g, eps2, masses, rx, ry, rz);
             });
     }
 }

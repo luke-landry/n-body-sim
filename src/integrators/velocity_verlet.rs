@@ -1,6 +1,6 @@
 use crate::{
-    gravity::{Accelerations, Gravity},
-    integrators::Integrator,
+    gravity::Gravity,
+    integrators::{Accelerations, Integrator, compute_acceleration},
     simulation::Bodies,
 };
 
@@ -72,20 +72,13 @@ impl Integrator for VelocityVerletIntegrator {
         // Scopes to please the borrow checker when taking mutable references
         // to bodies in calculate_accelerations and the r and v variables
         {
-            self.gravity
-                .calculate_accelerations(bodies, &mut self.accelerations_current);
-            let ax = &self.accelerations_current.ax;
-            let ay = &self.accelerations_current.ay;
-            let az = &self.accelerations_current.az;
+            // 1. a_n = compute_acceleration(r_n)
+            compute_acceleration(&*self.gravity, bodies, &mut self.accelerations_current);
 
-            let rx = &mut bodies.pos_x;
-            let ry = &mut bodies.pos_y;
-            let rz = &mut bodies.pos_z;
+            let (ax, ay, az) = self.accelerations_current.as_slices();
+            let (_, rx, ry, rz, vx, vy, vz) = bodies.as_slices_mut();
 
-            let vx = &mut bodies.vel_x;
-            let vy = &mut bodies.vel_y;
-            let vz = &mut bodies.vel_z;
-
+            // 2. r_(n+1) = r_n + (v_n * dt) + (0.5 * a_n * dt^2)
             for i in 0..n {
                 rx[i] += (vx[i] * dt) + (0.5 * ax[i] * dt2);
                 ry[i] += (vy[i] * dt) + (0.5 * ay[i] * dt2);
@@ -93,21 +86,14 @@ impl Integrator for VelocityVerletIntegrator {
             }
         }
         {
-            self.gravity
-                .calculate_accelerations(bodies, &mut self.accelerations_next);
+            // 3. a_(n+1) = compute_acceleration(r_(n+1))
+            compute_acceleration(&*self.gravity, bodies, &mut self.accelerations_next);
 
-            let vx = &mut bodies.vel_x;
-            let vy = &mut bodies.vel_y;
-            let vz = &mut bodies.vel_z;
+            let (ax, ay, az) = self.accelerations_current.as_slices();
+            let (ax_next, ay_next, az_next) = self.accelerations_next.as_slices();
+            let (_, _, _, _, vx, vy, vz) = bodies.as_slices_mut();
 
-            let ax = &self.accelerations_current.ax;
-            let ay = &self.accelerations_current.ay;
-            let az = &self.accelerations_current.az;
-
-            let ax_next = &self.accelerations_next.ax;
-            let ay_next = &self.accelerations_next.ay;
-            let az_next = &self.accelerations_next.az;
-
+            // 4. v_(n+1) = v_n + (0.5 * (a_n + a_(n+1)) * dt)
             for i in 0..n {
                 vx[i] += 0.5 * (ax[i] + ax_next[i]) * dt;
                 vy[i] += 0.5 * (ay[i] + ay_next[i]) * dt;

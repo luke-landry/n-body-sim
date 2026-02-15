@@ -36,6 +36,41 @@ impl Bodies {
     pub fn len(&self) -> usize {
         self.masses.len()
     }
+
+    /// Return tuple of references to the mass, 3D position, and 3D velocity components
+    pub fn as_slices(&mut self) -> (&[f64], &[f64], &[f64], &[f64], &[f64], &[f64], &[f64]) {
+        (
+            &self.masses,
+            &self.pos_x,
+            &self.pos_y,
+            &self.pos_z,
+            &self.vel_x,
+            &self.vel_y,
+            &self.vel_z,
+        )
+    }
+    /// Return tuple of mutable references to the mass, 3D position, and 3D velocity components
+    pub fn as_slices_mut(
+        &mut self,
+    ) -> (
+        &mut [f64],
+        &mut [f64],
+        &mut [f64],
+        &mut [f64],
+        &mut [f64],
+        &mut [f64],
+        &mut [f64],
+    ) {
+        (
+            &mut self.masses,
+            &mut self.pos_x,
+            &mut self.pos_y,
+            &mut self.pos_z,
+            &mut self.vel_x,
+            &mut self.vel_y,
+            &mut self.vel_z,
+        )
+    }
 }
 
 impl From<&[Body]> for Bodies {

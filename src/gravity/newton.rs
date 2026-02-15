@@ -1,5 +1,4 @@
-use crate::gravity::{Accelerations, Gravity};
-use crate::simulation::Bodies;
+use crate::gravity::Gravity;
 
 pub struct NewtonGravity {
     g_constant: f64,
@@ -68,23 +67,22 @@ impl NewtonGravity {
         accumulate_pair() computes the { k*∆r } for a pair of bodies (i,j)
 */
 impl Gravity for NewtonGravity {
-    fn calculate_accelerations(&self, bodies: &Bodies, accelerations: &mut Accelerations) {
-        let n = bodies.len();
+    fn calculate_accelerations(
+        &self,
+        masses: &[f64],
+        rx: &[f64],
+        ry: &[f64],
+        rz: &[f64],
+        ax: &mut [f64],
+        ay: &mut [f64],
+        az: &mut [f64],
+    ) {
+        let n = masses.len();
         let g = self.g_constant;
         let eps2 = self.softening_factor.powi(2);
-
-        let m = &bodies.masses;
-
-        let rx = &bodies.pos_x;
-        let ry = &bodies.pos_y;
-        let rz = &bodies.pos_z;
-
-        let ax = &mut accelerations.ax;
-        let ay = &mut accelerations.ay;
-        let az = &mut accelerations.az;
-
         for i in 0..n {
-            (ax[i], ay[i], az[i]) = compute_acceleration_for_body(i, n, g, eps2, m, rx, ry, rz);
+            (ax[i], ay[i], az[i]) =
+                compute_acceleration_for_body(i, n, g, eps2, masses, rx, ry, rz);
         }
     }
 }

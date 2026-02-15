@@ -169,7 +169,7 @@ For 3+ bodies, the system generally becomes chaotic, which means it is highly se
 Integrators are algorithms that update the position and velocity of each body at every time step.
 - **Semi-implicit Euler**: A first-order symplectic integrator modified from the non-symplectic standard Euler method. It is simple and efficient but not the most accurate.
 - **Velocity Verlet**: A second-order symplectic integrator that provides improved accuracy by evaluating accelerations at the beginning and end of each time step and using both to update positions and velocities.
-- **Runge-Kutta (*planned*)**: The fourth-order Runge-Kutta method (RK4) is a non-symplectic integrator that achieves high accuracy by evaluating derivatives at four distinct points within each time step and combining them in a weighted average to update the state.
+- **Runge-Kutta**: The fourth-order Runge-Kutta method (RK4) is a non-symplectic integrator that achieves high accuracy by evaluating derivatives at four distinct points within each time step and combining them in a weighted average to update the state.
 
 
 In non-symplectic integrators, such as the standard Euler or Runge-Kutta methods, numerical rounding errors accumulate, causing the system to gain or lose energy over time (e.g., planets spiraling into the sun). Symplectic integrators keep these energy errors bounded, ensuring that orbits remain stable over long simulation periods. Symplectic integrators are generally more accurate for long-term simulations while non-symplectic higher-order integrators may be preferred for short-term accuracy.
@@ -213,4 +213,4 @@ A larger $\epsilon$ increases numerical stability by smoothing out interactions,
   - Windows: `cargo build --target x86_64-pc-windows-gnu`
 
 ## Benchmark
-To run benchmarks for all combinations of gravity and integrator methods at various body counts, pass the `--benchmark` flag to the executable. Or simply run `cargo run --release -- --benchmark` from the project root. See all benchmark options using the `--help` flag.
+To run benchmarks for all combinations of gravity and integrator methods at various body counts, pass the `--benchmark` flag to the executable. Or simply run `cargo run --release -- --benchmark` from the project root. The benchmark results will be saved to `benchmark_results.csv` unless otherwise specified with the `--benchmark-output-path` flag. See all benchmark options using the `--help` flag.

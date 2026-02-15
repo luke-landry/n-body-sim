@@ -116,7 +116,7 @@ class Launcher(QWidget):
 
         # integrator method
         self.integrator_input = QComboBox()
-        self.integrator_input.addItems(["euler", "velocity-verlet"])
+        self.integrator_input.addItems(["euler", "velocity-verlet", "runge-kutta"])
         self.integrator_input.setCurrentText(default_sim.integrator)
         sim_form_layout.addRow("Integrator Method:", self.integrator_input)
 

@@ -1,4 +1,4 @@
-use crate::gravity::Accelerations;
+use crate::integrators::{Accelerations, compute_acceleration};
 use crate::simulation::Bodies;
 use crate::{gravity::Gravity, integrators::Integrator};
 
@@ -56,33 +56,23 @@ impl EulerIntegrator {
 */
 impl Integrator for EulerIntegrator {
     fn step(&mut self, bodies: &mut Bodies) {
-        self.accelerations.zero();
-
         let n = bodies.len();
         let dt = self.time_step;
 
-        self.gravity
-            .calculate_accelerations(bodies, &mut self.accelerations);
-        let ax = &self.accelerations.ax;
-        let ay = &self.accelerations.ay;
-        let az = &self.accelerations.az;
+        // 1. a_n = compute_acceleration(r_n)
+        compute_acceleration(&*self.gravity, bodies, &mut self.accelerations);
 
-        let rx = &mut bodies.pos_x;
-        let ry = &mut bodies.pos_y;
-        let rz = &mut bodies.pos_z;
+        let (ax, ay, az) = self.accelerations.as_mut_slices();
+        let (_, rx, ry, rz, vx, vy, vz) = bodies.as_slices_mut();
 
-        let vx = &mut bodies.vel_x;
-        let vy = &mut bodies.vel_y;
-        let vz = &mut bodies.vel_z;
-
-        // v_(n+1) = v_n + a_n * dt
+        // 2. v_(n+1) = v_n + a_n * dt
         for i in 0..n {
             vx[i] += ax[i] * dt;
             vy[i] += ay[i] * dt;
             vz[i] += az[i] * dt;
         }
 
-        // r_(n+1) = r_n + v_(n+1) * dt
+        // 3. r_(n+1) = r_n + v_(n+1) * dt
         for i in 0..n {
             rx[i] += vx[i] * dt;
             ry[i] += vy[i] * dt;
