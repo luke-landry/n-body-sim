@@ -26,7 +26,7 @@ pub const DEFAULT_BENCHMARK_GRAVITY_METHODS: &str = "newton,newton-parallel";
 pub const DEFAULT_BENCHMARK_INTEGRATOR_METHODS: &str = "euler,velocity-verlet";
 
 /// Default n values for benchmarking when the benchmark flag is set
-pub const DEFAULT_BENCHMARK_N_VALUES: &str = "2,3,5,10,15,25,50,75,100,200,300";
+pub const DEFAULT_BENCHMARK_N_VALUES: &str = "2,3,5,10,15,25,50,75,100,150,200,250,300";
 
 pub const DEFAULT_BENCHMARK_NUM_RUNS: usize = 5;
 
