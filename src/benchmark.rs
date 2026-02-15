@@ -55,7 +55,25 @@ fn create_simulation(
     Simulator::new(bodies, parameters, integrator)
 }
 
-pub fn run_benchmark(args: Args) -> Result<(), Box<dyn Error>> {
+fn run_benchmark(
+    n: usize,
+    gravity_method: GravityMethod,
+    integrator_method: IntegratorMethod,
+    args: &Args,
+) -> BenchmarkResult {
+    let mut simulation = create_simulation(n, gravity_method, integrator_method, args);
+    let start_time = Instant::now();
+    simulation.run();
+    let duration = start_time.elapsed();
+    BenchmarkResult {
+        n,
+        gravity: format!("{:?}", gravity_method),
+        integrator: format!("{:?}", integrator_method),
+        time_ms: duration.as_secs_f64() * 1000.0,
+    }
+}
+
+pub fn run_benchmarks(args: Args) -> Result<(), Box<dyn Error>> {
     println!("Running n-body-sim benchmarks...");
     println!(
         "{:>8} | {:>15} | {:>18} | {:>12}",
@@ -71,26 +89,13 @@ pub fn run_benchmark(args: Args) -> Result<(), Box<dyn Error>> {
     );
     warmup_sim.run();
 
-    let mut results = Vec::new();
+    let mut benchmark_results = Vec::new();
     for &n in args.benchmark_n_values.iter() {
         for &gravity_method in args.benchmark_gravity_methods.iter() {
             for &integrator_method in args.benchmark_integrator_methods.iter() {
                 for _ in 0..args.benchmark_num_runs {
-                    let mut simulation =
-                        create_simulation(n, gravity_method, integrator_method, &args);
-
-                    let start_time = Instant::now();
-                    simulation.run();
-                    let duration = start_time.elapsed();
-
-                    let time_ms = duration.as_secs_f64() * 1000.0;
-                    let benchmark_result = BenchmarkResult {
-                        n,
-                        gravity: format!("{:?}", gravity_method),
-                        integrator: format!("{:?}", integrator_method),
-                        time_ms,
-                    };
-
+                    let benchmark_result =
+                        run_benchmark(n, gravity_method, integrator_method, &args);
                     println!(
                         "{:>8} | {:>15} | {:>18} | {:>12.2}",
                         benchmark_result.n,
@@ -98,13 +103,13 @@ pub fn run_benchmark(args: Args) -> Result<(), Box<dyn Error>> {
                         benchmark_result.integrator,
                         benchmark_result.time_ms
                     );
-                    results.push(benchmark_result);
+                    benchmark_results.push(benchmark_result);
                 }
             }
         }
     }
 
-    save_results_to_csv(&results, &args.benchmark_output_path)?;
+    save_results_to_csv(&benchmark_results, &args.benchmark_output_path)?;
 
     Ok(())
 }
