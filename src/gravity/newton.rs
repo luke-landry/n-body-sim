@@ -1,7 +1,5 @@
-use glam::DVec3;
-
-use crate::gravity::Gravity;
-use crate::simulation::Body;
+use crate::gravity::{Accelerations, Gravity};
+use crate::simulation::Bodies;
 
 pub struct NewtonGravity {
     g_constant: f64,
@@ -56,58 +54,77 @@ impl NewtonGravity {
         r^2 = ∆x^2 + ∆y^2 + ∆z^2
 
     Letting
-        k = G / (r^2 + ε^2)^(3/2)
+        k = (G * m_j) / (r^2 + ε^2)^(3/2)
     we have
-        a_ix = ∑(j=1..N, j != i){ k*m_j*∆x }
-        a_iy = ∑(j=1..N, j != i){ k*m_j*∆y }
-        a_iz = ∑(j=1..N, j != i){ k*m_j*∆z }
-    where computing k once per (i,j) saves having to recalculate the full formula
-
-    By Newton's 3rd law, the force between a pair of bodies is equal and opposite:
-        F_i = -F_j
-    Since a = F / m, the acceleration on body i due to body j is proportional to m_j,
-    and the acceleration on body j due to body i is opposite in direction and proportional to m_i.
-        a_ix += k*m_j*∆x
-        a_iy += k*m_j*∆y
-        a_iz += k*m_j*∆z
-    implies
-        a_jx -= k*m_i*∆x
-        a_jy -= k*m_i*∆y
-        a_jz -= k*m_i*∆z
-    This means we can compute the pairwise interactions in the same iteration, so for example the
-    iteration computing the effect of b2 on b1 can easily compute the effect of b1 on b2 as well.
-    This means instead of iterating (i=1..N)*(j=1..N), we can iterate (i=1..N)*(j=i+1..N)
-    This reduces the number of iterations we need to perform from (N^2)-N to (N*(N-1))/2.
-    The time complexity is still O(N^2), but this optimization effectively halves the # of
-    iterations compared to a naive implementation.
-
-    With r and a as (x,y,z) vectors, with r=(∆x, ∆y, ∆x)
-        a_ix += k*m_j*∆x, a_jx -= k*m_i*∆x
-        a_iy += k*m_j*∆y, a_jy -= k*m_i*∆y
-        a_iz += k*m_j*∆z, a_jz -= k*m_i*∆z
-    can be written as
-        a_i = k * m_j * r
-        a_j = k * m_i * r
-    and simplified to
-        a_i = (k * r) * m_j
-        a_j = (k * r)* m_i
+        a_ix = ∑(j=1..N, j != i){ k*∆x }
+        a_iy = ∑(j=1..N, j != i){ k*∆y }
+        a_iz = ∑(j=1..N, j != i){ k*∆z }
+    where computing k once per (i,j) saves having to recalculate the full formula for each component.
 */
 impl Gravity for NewtonGravity {
-    fn calculate_accelerations(&self, bodies: &[Body], accelerations: &mut [DVec3]) {
-        let g = self.g_constant;
-        let epsilon_squared = self.softening_factor.powi(2);
+    fn calculate_accelerations(&self, bodies: &Bodies, accelerations: &mut Accelerations) {
         let n = bodies.len();
+        let g = self.g_constant;
+        let eps2 = self.softening_factor.powi(2);
+
+        let m = &bodies.masses;
+
+        let rx = &bodies.pos_x;
+        let ry = &bodies.pos_y;
+        let rz = &bodies.pos_z;
 
         for i in 0..n {
-            for j in i + 1..n {
-                let m_i = bodies[i].mass;
-                let m_j = bodies[j].mass;
-                let r = bodies[j].position - bodies[i].position;
-                let k = g / ((r.length_squared() + epsilon_squared).powf(1.5));
-                let kr = k * r;
+            let ax_i = &mut accelerations.ax[i];
+            let ay_i = &mut accelerations.ay[i];
+            let az_i = &mut accelerations.az[i];
+            let rx_i = rx[i];
+            let ry_i = ry[i];
+            let rz_i = rz[i];
 
-                accelerations[i] += kr * m_j;
-                accelerations[j] -= kr * m_i;
+            // split the loop into two to avoid the if statement for
+            //      if j != i { continue; }
+            // to avoid branching in the loop
+
+            for j in 0..i {
+                let m_j = m[j];
+                let dx = rx[j] - rx_i;
+                let dy = ry[j] - ry_i;
+                let dz = rz[j] - rz_i;
+                let r2 = (dx * dx) + (dy * dy) + (dz * dz);
+                let r_softened = r2 + eps2;
+
+                // this is equivalent to using r_softened.powf(-1.5) but avoids an expensive
+                // floating-point exponentiation and instead uses a single square root
+                // and a few multiplications, which is much faster
+                let inv_r_softened_sqrt = 1.0 / r_softened.sqrt();
+                let inv_r_softened_sqrt_cubed =
+                    inv_r_softened_sqrt * inv_r_softened_sqrt * inv_r_softened_sqrt;
+
+                let k = g * m_j * inv_r_softened_sqrt_cubed;
+                *ax_i += k * dx;
+                *ay_i += k * dy;
+                *az_i += k * dz;
+            }
+
+            for j in (i + 1)..n {
+                let m_j = m[j];
+                let dx = rx[j] - rx_i;
+                let dy = ry[j] - ry_i;
+                let dz = rz[j] - rz_i;
+                let r2 = (dx * dx) + (dy * dy) + (dz * dz);
+                let r_softened = r2 + eps2;
+
+                // this is equivalent to using r_softened.powf(-1.5) but avoids an expensive
+                // floating-point exponentiation and instead uses a single square root
+                // and a few multiplications, which is much faster
+                let inv_r_softened_sqrt = 1.0 / r_softened.sqrt();
+                let inv_r_softened_sqrt_cubed =
+                    inv_r_softened_sqrt * inv_r_softened_sqrt * inv_r_softened_sqrt;
+
+                let k = g * m_j * inv_r_softened_sqrt_cubed;
+                *ax_i += k * dx;
+                *ay_i += k * dy;
+                *az_i += k * dz;
             }
         }
     }

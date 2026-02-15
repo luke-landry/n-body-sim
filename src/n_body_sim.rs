@@ -2,7 +2,6 @@ use crate::cli::Args;
 use crate::input;
 use crate::output;
 use crate::simulation::{Parameters, Simulator};
-use clap::Parser;
 use std::error::Error;
 
 pub struct NBodySim {
