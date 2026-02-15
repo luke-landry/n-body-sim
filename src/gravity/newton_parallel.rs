@@ -1,6 +1,6 @@
+use crate::gravity::newton::compute_acceleration_for_body;
 use crate::gravity::{Accelerations, Gravity};
 use crate::simulation::Bodies;
-use glam::DVec3;
 use rayon::prelude::*;
 
 pub struct NewtonParallelGravity {
@@ -20,39 +20,35 @@ impl NewtonParallelGravity {
 /*
     Using the following equations from the sequential Newton gravity implementation,
     the acceleration per body can be calculated independently in parallel:
-        a_ix = ∑(j=1..N, j != i){ k*m_j*∆x }
-        a_iy = ∑(j=1..N, j != i){ k*m_j*∆y }
-        a_iz = ∑(j=1..N, j != i){ k*m_j*∆z }
+        a_ix = ∑(j=1..N, j != i){ k*∆x }
+        a_iy = ∑(j=1..N, j != i){ k*∆y }
+        a_iz = ∑(j=1..N, j != i){ k*∆z }
     where
-        k = G / (r^2 + ε^2)^(3/2)
+        k = (G * m_j)/ (r^2 + ε^2)^(3/2)
 
     To parallelize the calculations, we can use par_iter from the rayon library, which
     will divide the work of calculating accelerations for each body using a thread pool.
-    To keep each calculation independent so that it can be computed in parallel, the "trick"
-    using Newton's third law that allows partially updating the acceleration of body j while
-    calculating the acceleration of body i to reduce the number of iterations cannot be used
-    here because multiple threads may try to update the same acceleration value at the exact
-    same time. So, the loop will have to iterate N^2 times, however the overall performance
-    should still be relatively improved for larger N due to the parallelization of the
-    calculations across multiple threads.
 */
 impl Gravity for NewtonParallelGravity {
     fn calculate_accelerations(&self, bodies: &Bodies, accelerations: &mut Accelerations) {
-        // let g = self.g_constant;
-        // let epsilon_squared = self.softening_factor.powi(2);
-        // accelerations
-        //     .par_iter_mut()
-        //     .enumerate()
-        //     .for_each(|(i, a_i)| {
-        //         let pos_i = bodies[i].position;
-        //         for (j, body_j) in bodies.iter().enumerate() {
-        //             if i == j {
-        //                 continue;
-        //             }
-        //             let r = body_j.position - pos_i;
-        //             let k = g / ((r.length_squared() + epsilon_squared).powf(1.5));
-        //             *a_i += k * body_j.mass * r;
-        //         }
-        //     });
+        let n = bodies.len();
+        let g = self.g_constant;
+        let eps2 = self.softening_factor.powi(2);
+
+        let m = &bodies.masses;
+
+        let rx = &bodies.pos_x;
+        let ry = &bodies.pos_y;
+        let rz = &bodies.pos_z;
+
+        accelerations
+            .ax
+            .par_iter_mut()
+            .zip(accelerations.ay.par_iter_mut())
+            .zip(accelerations.az.par_iter_mut())
+            .enumerate()
+            .for_each(|(i, ((ax_i, ay_i), az_i))| {
+                (*ax_i, *ay_i, *az_i) = compute_acceleration_for_body(i, n, g, eps2, m, rx, ry, rz);
+            });
     }
 }
