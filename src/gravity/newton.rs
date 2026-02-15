@@ -79,15 +79,17 @@ impl Gravity for NewtonGravity {
     ) {
         let n = masses.len();
         let g = self.g_constant;
-        let eps2 = self.softening_factor.powi(2);
+        let eps2 = self.softening_factor * self.softening_factor;
         for i in 0..n {
-            (ax[i], ay[i], az[i]) =
-                compute_acceleration_for_body(i, n, g, eps2, masses, rx, ry, rz);
+            compute_acceleration_for_body(
+                i, n, g, eps2, masses, rx, ry, rz, &mut ax[i], &mut ay[i], &mut az[i],
+            );
         }
     }
 }
 
 // Computes the acceleration components for body i from all other bodies j != i.
+// The implementation uses output parameters to avoid overhead of returning by value
 pub fn compute_acceleration_for_body(
     i: usize,
     n: usize,
@@ -97,33 +99,23 @@ pub fn compute_acceleration_for_body(
     rx: &[f64],
     ry: &[f64],
     rz: &[f64],
-) -> (f64, f64, f64) {
-    let rx_i = rx[i];
-    let ry_i = ry[i];
-    let rz_i = rz[i];
-    let mut ax = 0.0;
-    let mut ay = 0.0;
-    let mut az = 0.0;
-
-    let mut accumulate_pair = |j: usize| {
-        let [ax_ij, ay_ij, az_ij] =
-            acceleration_function(g, eps2, m[j], [rx_i, ry_i, rz_i], [rx[j], ry[j], rz[j]]);
-        ax += ax_ij;
-        ay += ay_ij;
-        az += az_ij;
-    };
-
+    ax_i: &mut f64,
+    ay_i: &mut f64,
+    az_i: &mut f64,
+) {
     // split the loop into two to avoid the if statement for
     //      if j != i { continue; }
     // to avoid branching in a single loop
-
     for j in 0..i {
-        accumulate_pair(j);
+        accumulate_acceleration(
+            g, eps2, m[j], rx[j], ry[j], rz[j], rx[i], ry[i], rz[i], ax_i, ay_i, az_i,
+        );
     }
     for j in (i + 1)..n {
-        accumulate_pair(j);
+        accumulate_acceleration(
+            g, eps2, m[j], rx[j], ry[j], rz[j], rx[i], ry[i], rz[i], ax_i, ay_i, az_i,
+        );
     }
-    (ax, ay, az)
 }
 
 // Computes the contribution to the acceleration of body i from body j using the formulas:
@@ -132,23 +124,42 @@ pub fn compute_acceleration_for_body(
 //      a_iz += k*∆z
 // where
 //      k = (G * m_j) / (r^2 + ε^2)^(3/2)
-// pub fn accumulate_pair(
+fn accumulate_acceleration(
+    g: f64,
+    eps2: f64,
+    m_j: f64,
+    rx_j: f64,
+    ry_j: f64,
+    rz_j: f64,
+    rx_i: f64,
+    ry_i: f64,
+    rz_i: f64,
+    ax_i: &mut f64,
+    ay_i: &mut f64,
+    az_i: &mut f64,
+) {
+    let dx = rx_j - rx_i;
+    let dy = ry_j - ry_i;
+    let dz = rz_j - rz_i;
+    let r2 = (dx * dx) + (dy * dy) + (dz * dz);
+    let inv_r_softened = 1.0 / (r2 + eps2).sqrt();
+    let inv_r_softened_cubed = inv_r_softened * inv_r_softened * inv_r_softened;
+    let k = g * m_j * inv_r_softened_cubed;
+    *ax_i += k * dx;
+    *ay_i += k * dy;
+    *az_i += k * dz;
+}
+
+// pub fn acceleration_function(
 //     g: f64,
 //     eps2: f64,
 //     m_j: f64,
-//     rx_j: f64,
-//     ry_j: f64,
-//     rz_j: f64,
-//     rx_i: f64,
-//     ry_i: f64,
-//     rz_i: f64,
-//     ax_i: &mut f64,
-//     ay_i: &mut f64,
-//     az_i: &mut f64,
-// ) {
-//     let dx = rx_j - rx_i;
-//     let dy = ry_j - ry_i;
-//     let dz = rz_j - rz_i;
+//     r_i: [f64; 3],
+//     r_j: [f64; 3],
+// ) -> [f64; 3] {
+//     let dx = r_j[0] - r_i[0];
+//     let dy = r_j[1] - r_i[1];
+//     let dz = r_j[2] - r_i[2];
 //     let r2 = dx * dx + dy * dy + dz * dz;
 //     let r_softened = r2 + eps2;
 
@@ -159,30 +170,5 @@ pub fn compute_acceleration_for_body(
 //     let inv_r_softened_sqrt_cubed = inv_r_softened_sqrt * inv_r_softened_sqrt * inv_r_softened_sqrt;
 
 //     let k = g * m_j * inv_r_softened_sqrt_cubed;
-//     *ax_i += k * dx;
-//     *ay_i += k * dy;
-//     *az_i += k * dz;
+//     [k * dx, k * dy, k * dz]
 // }
-
-pub fn acceleration_function(
-    g: f64,
-    eps2: f64,
-    m_j: f64,
-    r_i: [f64; 3],
-    r_j: [f64; 3],
-) -> [f64; 3] {
-    let dx = r_j[0] - r_i[0];
-    let dy = r_j[1] - r_i[1];
-    let dz = r_j[2] - r_i[2];
-    let r2 = dx * dx + dy * dy + dz * dz;
-    let r_softened = r2 + eps2;
-
-    // this is equivalent to using r_softened.powf(-1.5) but avoids an expensive
-    // floating-point exponentiation and instead uses a single square root
-    // and a few multiplications, which is much faster
-    let inv_r_softened_sqrt = 1.0 / r_softened.sqrt();
-    let inv_r_softened_sqrt_cubed = inv_r_softened_sqrt * inv_r_softened_sqrt * inv_r_softened_sqrt;
-
-    let k = g * m_j * inv_r_softened_sqrt_cubed;
-    [k * dx, k * dy, k * dz]
-}
