@@ -57,23 +57,23 @@ impl EulerIntegrator {
 impl Integrator for EulerIntegrator {
     fn step(&mut self, bodies: &mut Bodies) {
         self.accelerations.zero();
+
+        let n = bodies.len();
+        let dt = self.time_step;
+
         self.gravity
             .calculate_accelerations(bodies, &mut self.accelerations);
-
-        let dt = self.time_step;
-        let n = bodies.len();
-
         let ax = &self.accelerations.ax;
         let ay = &self.accelerations.ay;
         let az = &self.accelerations.az;
 
-        let vx = &mut bodies.vel_x;
-        let vy = &mut bodies.vel_y;
-        let vz = &mut bodies.vel_z;
-
         let rx = &mut bodies.pos_x;
         let ry = &mut bodies.pos_y;
         let rz = &mut bodies.pos_z;
+
+        let vx = &mut bodies.vel_x;
+        let vy = &mut bodies.vel_y;
+        let vz = &mut bodies.vel_z;
 
         // v_(n+1) = v_n + a_n * dt
         for i in 0..n {
