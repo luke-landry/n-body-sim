@@ -8,5 +8,6 @@ barnes_hut = "1.0.8"
 clap = { version = "4.5.53", features = ["derive"] }
 csv = "1.4.0"
 glam = "0.31.0"
+lin_alg = "1.4.0"
 rayon = "1.11.0"
 serde = { version = "1.0.228", features = ["derive"] }

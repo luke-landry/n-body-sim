@@ -39,17 +39,15 @@ impl Gravity for NewtonParallelGravity {
         ay: &mut [f64],
         az: &mut [f64],
     ) {
-        let n = masses.len();
         let g = self.g_constant;
         let eps2 = self.softening_factor * self.softening_factor;
-
         ax.par_iter_mut()
             .zip(ay.par_iter_mut())
             .zip(az.par_iter_mut())
             .enumerate()
             .for_each(|(i, ((ax_i, ay_i), az_i))| {
                 (*ax_i, *ay_i, *az_i) =
-                    compute_acceleration_for_body(i, n, g, eps2, masses, rx, ry, rz);
+                    compute_acceleration_for_body(i, g, eps2, masses, rx, ry, rz);
             });
     }
 }

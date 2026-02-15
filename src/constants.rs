@@ -21,7 +21,7 @@ pub const DEFAULT_INTEGRATOR: &str = "euler";
 /// Default theta value for barnes hut gravity calculations
 pub const DEFAULT_THETA: f64 = 0.5;
 
-pub const DEFAULT_BENCHMARK_GRAVITY_METHODS: &str = "newton,newton-parallel";
+pub const DEFAULT_BENCHMARK_GRAVITY_METHODS: &str = "newton,newton-parallel,barnes-hut";
 
 pub const DEFAULT_BENCHMARK_INTEGRATOR_METHODS: &str = "euler,velocity-verlet,runge-kutta";
 
