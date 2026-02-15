@@ -22,15 +22,9 @@ pub fn load_bodies(path: &Path) -> Result<Vec<Body>, Box<dyn Error>> {
     let mut csv_reader = Reader::from_path(path)?;
     csv_reader
         .deserialize::<InitialCondition>()
-        .enumerate()
-        .map(|(id, result)| {
+        .map(|result| {
             result.map(|ic| {
-                // println!(
-                //     "read body #{:0>4} | Mass: {:>12e} | Pos: ({:>12e}, {:>12e}, {:>12e}) | Vel: ({:>12e}, {:>12e}, {:>12e}) |",
-                //     id, ic.mass, ic.pos_x, ic.pos_y, ic.pos_z, ic.vel_x, ic.vel_y, ic.vel_z
-                // );
                 Body::new(
-                    id,
                     ic.mass,
                     DVec3::new(ic.pos_x, ic.pos_y, ic.pos_z),
                     DVec3::new(ic.vel_x, ic.vel_y, ic.vel_z),

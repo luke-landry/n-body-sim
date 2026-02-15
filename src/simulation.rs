@@ -4,16 +4,14 @@ use glam::DVec3;
 
 #[derive(Clone)]
 pub struct Body {
-    pub id: usize,
     pub mass: f64,
     pub position: DVec3,
     pub velocity: DVec3,
 }
 
 impl Body {
-    pub fn new(id: usize, mass: f64, position: DVec3, velocity: DVec3) -> Self {
+    pub fn new(mass: f64, position: DVec3, velocity: DVec3) -> Self {
         Self {
-            id,
             mass,
             position,
             velocity,
@@ -110,7 +108,6 @@ impl Into<Vec<Body>> for Bodies {
         let mut bodies = Vec::with_capacity(self.masses.len());
         for i in 0..self.masses.len() {
             bodies.push(Body {
-                id: i,
                 mass: self.masses[i],
                 position: DVec3::new(self.pos_x[i], self.pos_y[i], self.pos_z[i]),
                 velocity: DVec3::new(self.vel_x[i], self.vel_y[i], self.vel_z[i]),

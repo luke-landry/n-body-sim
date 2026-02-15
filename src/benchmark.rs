@@ -27,7 +27,6 @@ fn save_results_to_csv(results: &[BenchmarkResult], path: &Path) -> Result<(), B
 fn generate_bodies(n: usize) -> Vec<Body> {
     (0..n)
         .map(|i| Body {
-            id: i,
             mass: 1.0,
             position: DVec3::new(i as f64, 0.0, 0.0),
             velocity: DVec3::new(0.0, 1.0, 0.0),
