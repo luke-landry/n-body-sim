@@ -48,13 +48,34 @@ pub struct Args {
     #[arg(long, default_value = constants::DEFAULT_INTEGRATOR)]
     pub integrator: IntegratorMethod,
 
-    /// Flag to enable progress output to stdout
+    /// Flag to enable percent progress output to stdout
     #[arg(long)]
     pub progress: bool,
 
-    /// Flag to run benchmarks (will ignore other parameters)
+    /// Flag to run benchmarks instead of a simulation.
+    /// When set, the file paths and gravity and integrator parameters are ignored
     #[arg(long)]
     pub benchmark: bool,
+
+    /// Flag to specify the N values to use for benchmarks (comma-separated list, e.g. "10,50,250")
+    #[arg(long, value_delimiter = ',', default_value = constants::DEFAULT_BENCHMARK_N_VALUES)]
+    pub benchmark_n_values: Vec<usize>,
+
+    /// Comma-separated list of gravity methods to use for benchmarks
+    #[arg(long, value_delimiter = ',', default_value = constants::DEFAULT_BENCHMARK_GRAVITY_METHODS)]
+    pub benchmark_gravity_methods: Vec<GravityMethod>,
+
+    /// Comma-separated list of integrator methods to use for benchmarks
+    #[arg(long, value_delimiter = ',', default_value = constants::DEFAULT_BENCHMARK_INTEGRATOR_METHODS)]
+    pub benchmark_integrator_methods: Vec<IntegratorMethod>,
+
+    /// Number of benchmark runs per N-gravity-integrator combination
+    #[arg(long, default_value_t = constants::DEFAULT_BENCHMARK_NUM_RUNS)]
+    pub benchmark_num_runs: usize,
+
+    /// Path to CSV file to save benchmark results
+    #[arg(long, default_value = constants::DEFAULT_BENCHMARK_OUTPUT_PATH)]
+    pub benchmark_output_path: PathBuf,
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]

@@ -211,3 +211,6 @@ A larger $\epsilon$ increases numerical stability by smoothing out interactions,
 ### Build Physics Engine Executable
   - Linux: `cargo build`
   - Windows: `cargo build --target x86_64-pc-windows-gnu`
+
+## Benchmark
+To run benchmarks for all combinations of gravity and integrator methods at various body counts, pass the `--benchmark` flag to the executable. Or simply run `cargo run --release -- --benchmark` from the project root. See all benchmark options using the `--help` flag.

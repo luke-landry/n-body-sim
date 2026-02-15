@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
     if args.benchmark {
-        return benchmark::run_benchmark();
+        return benchmark::run_benchmark(args);
     }
 
     let sim = NBodySim::new(args)?;

@@ -1,23 +1,11 @@
 use glam::DVec3;
 use serde::Serialize;
 use std::error::Error;
+use std::path::Path;
 use std::time::Instant;
 
-use crate::cli::{GravityMethod, IntegratorMethod};
+use crate::cli::{Args, GravityMethod, IntegratorMethod};
 use crate::simulation::{Body, Parameters, Simulator};
-
-const N_VALUES: &[usize] = &[2, 3, 5, 10, 15, 25, 50, 75, 100, 200, 300];
-const GRAVITY_METHODS: &[GravityMethod] = &[GravityMethod::Newton, GravityMethod::NewtonParallel];
-const INTEGRATOR_METHODS: &[IntegratorMethod] =
-    &[IntegratorMethod::Euler, IntegratorMethod::VelocityVerlet];
-const NUMBER_OF_RUNS: usize = 5;
-
-const NUM_STEPS: usize = 10000;
-const TIME_STEP: f64 = 0.01;
-const G_CONSTANT: f64 = 1.0;
-const SOFTENING: f64 = 0.005;
-const THETA: f64 = 0.5;
-const PROGRESS: bool = false;
 
 #[derive(Debug, Serialize)]
 struct BenchmarkResult {
@@ -27,7 +15,7 @@ struct BenchmarkResult {
     time_ms: f64,
 }
 
-fn save_results_to_csv(results: &[BenchmarkResult], path: &str) -> Result<(), Box<dyn Error>> {
+fn save_results_to_csv(results: &[BenchmarkResult], path: &Path) -> Result<(), Box<dyn Error>> {
     let mut wtr = csv::Writer::from_path(path)?;
     for result in results {
         wtr.serialize(result)?;
@@ -51,41 +39,45 @@ fn create_simulation(
     n: usize,
     gravity_method: GravityMethod,
     integrator_method: IntegratorMethod,
+    args: &Args,
 ) -> Simulator {
     let bodies = generate_bodies(n);
     let parameters = Parameters {
-        time_step: TIME_STEP,
-        num_steps: NUM_STEPS,
-        g_constant: G_CONSTANT,
-        softening_factor: SOFTENING,
-        theta: THETA,
-        progress: PROGRESS,
+        time_step: args.time_step,
+        num_steps: args.num_steps,
+        g_constant: args.g_constant,
+        softening_factor: args.softening_factor,
+        theta: args.theta,
+        progress: args.progress,
     };
     let gravity = gravity_method.create(&parameters);
     let integrator = integrator_method.create(gravity, parameters.time_step, bodies.len());
     Simulator::new(bodies, parameters, integrator)
 }
 
-pub fn run_benchmark() -> Result<(), Box<dyn Error>> {
+pub fn run_benchmark(args: Args) -> Result<(), Box<dyn Error>> {
+    println!("Running n-body-sim benchmarks...");
     println!(
         "{:>8} | {:>15} | {:>18} | {:>12}",
         "N", "Gravity", "Integrator", "Time (ms)"
     );
-    println!("{}", "-".repeat(60));
+    println!("{}", "-".repeat(62));
 
     let mut warmup_sim = create_simulation(
         2,
         GravityMethod::NewtonParallel,
         IntegratorMethod::VelocityVerlet,
+        &args,
     );
     warmup_sim.run();
 
     let mut results = Vec::new();
-    for &n in N_VALUES {
-        for &gravity_method in GRAVITY_METHODS {
-            for &integrator_method in INTEGRATOR_METHODS {
-                for _ in 0..NUMBER_OF_RUNS {
-                    let mut simulation = create_simulation(n, gravity_method, integrator_method);
+    for &n in args.benchmark_n_values.iter() {
+        for &gravity_method in args.benchmark_gravity_methods.iter() {
+            for &integrator_method in args.benchmark_integrator_methods.iter() {
+                for _ in 0..args.benchmark_num_runs {
+                    let mut simulation =
+                        create_simulation(n, gravity_method, integrator_method, &args);
 
                     let start_time = Instant::now();
                     simulation.run();
@@ -112,7 +104,7 @@ pub fn run_benchmark() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    save_results_to_csv(&results, "benchmark_results.csv")?;
+    save_results_to_csv(&results, &args.benchmark_output_path)?;
 
     Ok(())
 }
