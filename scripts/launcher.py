@@ -110,7 +110,7 @@ class Launcher(QWidget):
 
         # gravity method
         self.gravity_input = QComboBox()
-        self.gravity_input.addItems(["newton", "newton-parallel"])
+        self.gravity_input.addItems(["newton", "newton-parallel", "barnes-hut"])
         self.gravity_input.setCurrentText(default_sim.gravity)
         sim_form_layout.addRow("Gravity Method:", self.gravity_input)
 

@@ -18,8 +18,8 @@ class SimulationParameters(BaseModel):
     time_step: PositiveFloat = 0.025
     num_steps: PositiveInt = 10000
     softening_factor: float = 0.05
-    theta: PositiveFloat = 0.5
-    gravity: Literal["newton", "newton-parallel"] = "newton"
+    theta: NonNegativeFloat = 0.5
+    gravity: Literal["newton", "newton-parallel", "barnes-hut"] = "newton"
     integrator: Literal["euler", "velocity-verlet", "runge-kutta"] = "euler"
     progress: bool = False
 

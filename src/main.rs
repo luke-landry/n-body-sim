@@ -1,3 +1,5 @@
+#![allow(mixed_script_confusables)]
+
 mod benchmark;
 mod cli;
 mod constants;

@@ -81,24 +81,23 @@ impl Gravity for NewtonGravity {
         let g = self.g_constant;
         let eps2 = self.softening_factor * self.softening_factor;
         for i in 0..n {
-            (ax[i], ay[i], az[i]) =
-                compute_acceleration_for_body(i, n, g, eps2, masses, rx, ry, rz);
+            (ax[i], ay[i], az[i]) = compute_acceleration_for_body(i, g, eps2, masses, rx, ry, rz);
         }
     }
 }
 
-// Computes the acceleration components for body i from all other bodies j != i.
-// The implementation uses output parameters to avoid overhead of returning by value
+/// Computes the acceleration components for body i from all other bodies j != i.
+/// The implementation uses output parameters to avoid overhead of returning by value
 pub fn compute_acceleration_for_body(
     i: usize,
-    n: usize,
     g: f64,
     eps2: f64,
-    m: &[f64],
+    masses: &[f64],
     rx: &[f64],
     ry: &[f64],
     rz: &[f64],
 ) -> (f64, f64, f64) {
+    let n = masses.len();
     let mut ax_i = 0.0;
     let mut ay_i = 0.0;
     let mut az_i = 0.0;
@@ -107,25 +106,26 @@ pub fn compute_acceleration_for_body(
     // to avoid branching in a single loop
     for j in 0..i {
         accumulate_acceleration(
-            g, eps2, m[j], rx[j], ry[j], rz[j], rx[i], ry[i], rz[i], &mut ax_i, &mut ay_i,
+            g, eps2, masses[j], rx[j], ry[j], rz[j], rx[i], ry[i], rz[i], &mut ax_i, &mut ay_i,
             &mut az_i,
         );
     }
     for j in (i + 1)..n {
         accumulate_acceleration(
-            g, eps2, m[j], rx[j], ry[j], rz[j], rx[i], ry[i], rz[i], &mut ax_i, &mut ay_i,
+            g, eps2, masses[j], rx[j], ry[j], rz[j], rx[i], ry[i], rz[i], &mut ax_i, &mut ay_i,
             &mut az_i,
         );
     }
     (ax_i, ay_i, az_i)
 }
 
-// Computes the contribution to the acceleration of body i from body j using the formulas:
+// Accumulates the contribution to the acceleration of body i from body j using the formulas:
 //      a_ix += k*∆x
 //      a_iy += k*∆y
 //      a_iz += k*∆z
 // where
 //      k = (G * m_j) / (r^2 + ε^2)^(3/2)
+// to the current values of ax_i, ay_i, and az_i
 fn accumulate_acceleration(
     g: f64,
     eps2: f64,
