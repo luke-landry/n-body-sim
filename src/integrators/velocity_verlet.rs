@@ -1,16 +1,14 @@
-use glam::DVec3;
-
 use crate::{
-    gravity::Gravity,
+    gravity::{Accelerations, Gravity},
     integrators::Integrator,
-    simulation::{Bodies, Body},
+    simulation::Bodies,
 };
 
 pub struct VelocityVerletIntegrator {
     gravity: Box<dyn Gravity>,
     time_step: f64,
-    accelerations_current: Vec<DVec3>,
-    accelerations_next: Vec<DVec3>,
+    accelerations_current: Accelerations,
+    accelerations_next: Accelerations,
 }
 
 impl VelocityVerletIntegrator {
@@ -18,8 +16,16 @@ impl VelocityVerletIntegrator {
         VelocityVerletIntegrator {
             gravity,
             time_step,
-            accelerations_current: vec![DVec3::ZERO; num_bodies],
-            accelerations_next: vec![DVec3::ZERO; num_bodies],
+            accelerations_current: Accelerations {
+                ax: vec![0.0; num_bodies],
+                ay: vec![0.0; num_bodies],
+                az: vec![0.0; num_bodies],
+            },
+            accelerations_next: Accelerations {
+                ax: vec![0.0; num_bodies],
+                ay: vec![0.0; num_bodies],
+                az: vec![0.0; num_bodies],
+            },
         }
     }
 }
@@ -53,29 +59,60 @@ impl VelocityVerletIntegrator {
     The Velocity Verlet algorithm is a symplectic integrator, so it will conserve energy better
     than non-symplectic integrators. It is also a second-order method, which means it is more
     accurate than first-order methods like Euler's method, especially for larger time steps.
-
 */
 impl Integrator for VelocityVerletIntegrator {
     fn step(&mut self, bodies: &mut Bodies) {
-        // self.accelerations_current.fill(DVec3::ZERO);
-        // self.accelerations_next.fill(DVec3::ZERO);
+        self.accelerations_current.zero();
+        self.accelerations_next.zero();
 
-        // // Calculate the current intermediate accelerations based on the current positions of the bodies
-        // self.gravity
-        //     .calculate_accelerations(bodies, &mut self.accelerations_current);
+        let n = bodies.len();
+        let dt = self.time_step;
+        let dt2 = dt * dt;
 
-        // for (i, body) in bodies.iter_mut().enumerate() {
-        //     body.position += (body.velocity * self.time_step)
-        //         + (0.5 * self.accelerations_current[i] * self.time_step * self.time_step);
-        // }
+        // Scopes to please the borrow checker when taking mutable references
+        // to bodies in calculate_accelerations and the r and v variables
+        {
+            self.gravity
+                .calculate_accelerations(bodies, &mut self.accelerations_current);
+            let ax = &self.accelerations_current.ax;
+            let ay = &self.accelerations_current.ay;
+            let az = &self.accelerations_current.az;
 
-        // // The next accelerations vector will store the accelerations after the position update
-        // self.gravity
-        //     .calculate_accelerations(bodies, &mut self.accelerations_next);
+            let rx = &mut bodies.pos_x;
+            let ry = &mut bodies.pos_y;
+            let rz = &mut bodies.pos_z;
 
-        // for (i, body) in bodies.iter_mut().enumerate() {
-        //     body.velocity +=
-        //         0.5 * (self.accelerations_current[i] + self.accelerations_next[i]) * self.time_step;
-        // }
+            let vx = &mut bodies.vel_x;
+            let vy = &mut bodies.vel_y;
+            let vz = &mut bodies.vel_z;
+
+            for i in 0..n {
+                rx[i] += (vx[i] * dt) + (0.5 * ax[i] * dt2);
+                ry[i] += (vy[i] * dt) + (0.5 * ay[i] * dt2);
+                rz[i] += (vz[i] * dt) + (0.5 * az[i] * dt2);
+            }
+        }
+        {
+            self.gravity
+                .calculate_accelerations(bodies, &mut self.accelerations_next);
+
+            let vx = &mut bodies.vel_x;
+            let vy = &mut bodies.vel_y;
+            let vz = &mut bodies.vel_z;
+
+            let ax = &self.accelerations_current.ax;
+            let ay = &self.accelerations_current.ay;
+            let az = &self.accelerations_current.az;
+
+            let ax_next = &self.accelerations_next.ax;
+            let ay_next = &self.accelerations_next.ay;
+            let az_next = &self.accelerations_next.az;
+
+            for i in 0..n {
+                vx[i] += 0.5 * (ax[i] + ax_next[i]) * dt;
+                vy[i] += 0.5 * (ay[i] + ay_next[i]) * dt;
+                vz[i] += 0.5 * (az[i] + az_next[i]) * dt;
+            }
+        }
     }
 }

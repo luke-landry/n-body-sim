@@ -89,7 +89,7 @@ impl Gravity for NewtonGravity {
     }
 }
 
-// Computes the acceleration components for body i by summing the contributions from all other bodies j != i.
+// Computes the acceleration components for body i from all other bodies j != i.
 pub fn compute_acceleration_for_body(
     i: usize,
     n: usize,
@@ -125,9 +125,11 @@ pub fn compute_acceleration_for_body(
 }
 
 // Computes the contribution to the acceleration of body i from body j using the formulas:
-//      a_ix += (G*m_j*∆x) / (r^2 + ε^2)^(3/2)
-//      a_iy += (G*m_j*∆y) / (r^2 + ε^2)^(3/2)
-//      a_iz += (G*m_j*∆z) / (r^2 + ε^2)^(3/2)
+//      a_ix += k*∆x
+//      a_iy += k*∆y
+//      a_iz += k*∆z
+// where
+//      k = (G * m_j) / (r^2 + ε^2)^(3/2)
 pub fn accumulate_pair(
     g: f64,
     eps2: f64,
