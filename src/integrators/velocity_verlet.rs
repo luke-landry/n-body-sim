@@ -1,6 +1,10 @@
 use glam::DVec3;
 
-use crate::{gravity::Gravity, integrators::Integrator, simulation::Body};
+use crate::{
+    gravity::Gravity,
+    integrators::Integrator,
+    simulation::{Bodies, Body},
+};
 
 pub struct VelocityVerletIntegrator {
     gravity: Box<dyn Gravity>,
@@ -52,26 +56,26 @@ impl VelocityVerletIntegrator {
 
 */
 impl Integrator for VelocityVerletIntegrator {
-    fn step(&mut self, bodies: &mut [Body]) {
-        self.accelerations_current.fill(DVec3::ZERO);
-        self.accelerations_next.fill(DVec3::ZERO);
+    fn step(&mut self, bodies: &mut Bodies) {
+        // self.accelerations_current.fill(DVec3::ZERO);
+        // self.accelerations_next.fill(DVec3::ZERO);
 
-        // Calculate the current intermediate accelerations based on the current positions of the bodies
-        self.gravity
-            .calculate_accelerations(bodies, &mut self.accelerations_current);
+        // // Calculate the current intermediate accelerations based on the current positions of the bodies
+        // self.gravity
+        //     .calculate_accelerations(bodies, &mut self.accelerations_current);
 
-        for (i, body) in bodies.iter_mut().enumerate() {
-            body.position += (body.velocity * self.time_step)
-                + (0.5 * self.accelerations_current[i] * self.time_step * self.time_step);
-        }
+        // for (i, body) in bodies.iter_mut().enumerate() {
+        //     body.position += (body.velocity * self.time_step)
+        //         + (0.5 * self.accelerations_current[i] * self.time_step * self.time_step);
+        // }
 
-        // The next accelerations vector will store the accelerations after the position update
-        self.gravity
-            .calculate_accelerations(bodies, &mut self.accelerations_next);
+        // // The next accelerations vector will store the accelerations after the position update
+        // self.gravity
+        //     .calculate_accelerations(bodies, &mut self.accelerations_next);
 
-        for (i, body) in bodies.iter_mut().enumerate() {
-            body.velocity +=
-                0.5 * (self.accelerations_current[i] + self.accelerations_next[i]) * self.time_step;
-        }
+        // for (i, body) in bodies.iter_mut().enumerate() {
+        //     body.velocity +=
+        //         0.5 * (self.accelerations_current[i] + self.accelerations_next[i]) * self.time_step;
+        // }
     }
 }

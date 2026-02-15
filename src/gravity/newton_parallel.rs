@@ -1,5 +1,5 @@
-use crate::gravity::Gravity;
-use crate::simulation::Body;
+use crate::gravity::{Accelerations, Gravity};
+use crate::simulation::Bodies;
 use glam::DVec3;
 use rayon::prelude::*;
 
@@ -37,22 +37,22 @@ impl NewtonParallelGravity {
     calculations across multiple threads.
 */
 impl Gravity for NewtonParallelGravity {
-    fn calculate_accelerations(&self, bodies: &[Body], accelerations: &mut [DVec3]) {
-        let g = self.g_constant;
-        let epsilon_squared = self.softening_factor.powi(2);
-        accelerations
-            .par_iter_mut()
-            .enumerate()
-            .for_each(|(i, a_i)| {
-                let pos_i = bodies[i].position;
-                for (j, body_j) in bodies.iter().enumerate() {
-                    if i == j {
-                        continue;
-                    }
-                    let r = body_j.position - pos_i;
-                    let k = g / ((r.length_squared() + epsilon_squared).powf(1.5));
-                    *a_i += k * body_j.mass * r;
-                }
-            });
+    fn calculate_accelerations(&self, bodies: &Bodies, accelerations: &mut Accelerations) {
+        // let g = self.g_constant;
+        // let epsilon_squared = self.softening_factor.powi(2);
+        // accelerations
+        //     .par_iter_mut()
+        //     .enumerate()
+        //     .for_each(|(i, a_i)| {
+        //         let pos_i = bodies[i].position;
+        //         for (j, body_j) in bodies.iter().enumerate() {
+        //             if i == j {
+        //                 continue;
+        //             }
+        //             let r = body_j.position - pos_i;
+        //             let k = g / ((r.length_squared() + epsilon_squared).powf(1.5));
+        //             *a_i += k * body_j.mass * r;
+        //         }
+        //     });
     }
 }

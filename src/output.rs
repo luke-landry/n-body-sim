@@ -1,6 +1,6 @@
 use std::{fmt, path::Path};
 
-use crate::simulation::Body;
+use crate::simulation::{Bodies, Body};
 use csv::Writer;
 use serde::Serialize;
 
@@ -33,6 +33,48 @@ impl fmt::Display for BodySnapshot {
             self.time, self.id, self.x, self.y
         )
     }
+}
+
+/// SoA representation of BodySnapshot
+pub struct BodiesSnapshot {
+    pub time: f64,
+    pub ids: Vec<usize>,
+    pub pos_x: Vec<f64>,
+    pub pos_y: Vec<f64>,
+    pub pos_z: Vec<f64>,
+}
+
+impl BodiesSnapshot {
+    pub fn from_state(bodies: &Bodies, time: f64) -> Self {
+        BodiesSnapshot {
+            time,
+            ids: (0..bodies.len()).collect(),
+            pos_x: bodies.pos_x.clone(),
+            pos_y: bodies.pos_y.clone(),
+            pos_z: bodies.pos_z.clone(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.ids.len()
+    }
+}
+
+pub fn flatten_bodies_snapshots(snapshots: &[BodiesSnapshot]) -> Vec<BodySnapshot> {
+    let mut flat = Vec::new();
+    for snapshot in snapshots {
+        let n = snapshot.len();
+        for i in 0..n {
+            flat.push(BodySnapshot {
+                time: snapshot.time,
+                id: snapshot.ids[i],
+                x: snapshot.pos_x[i],
+                y: snapshot.pos_y[i],
+                z: snapshot.pos_z[i],
+            });
+        }
+    }
+    flat
 }
 
 pub fn print_data(data: Vec<BodySnapshot>) {

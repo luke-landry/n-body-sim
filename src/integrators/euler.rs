@@ -1,11 +1,11 @@
-use glam::DVec3;
-
-use crate::{gravity::Gravity, integrators::Integrator, simulation::Body};
+use crate::gravity::Accelerations;
+use crate::simulation::Bodies;
+use crate::{gravity::Gravity, integrators::Integrator};
 
 pub struct EulerIntegrator {
     gravity: Box<dyn Gravity>,
     time_step: f64,
-    accelerations: Vec<DVec3>,
+    accelerations: Accelerations,
 }
 
 impl EulerIntegrator {
@@ -13,7 +13,11 @@ impl EulerIntegrator {
         EulerIntegrator {
             gravity,
             time_step,
-            accelerations: vec![DVec3::ZERO; num_bodies],
+            accelerations: Accelerations {
+                ax: vec![0.0; num_bodies],
+                ay: vec![0.0; num_bodies],
+                az: vec![0.0; num_bodies],
+            },
         }
     }
 }
@@ -51,13 +55,38 @@ impl EulerIntegrator {
     energy from drifting away over time.
 */
 impl Integrator for EulerIntegrator {
-    fn step(&mut self, bodies: &mut [Body]) {
-        self.accelerations.fill(DVec3::ZERO);
+    fn step(&mut self, bodies: &mut Bodies) {
+        self.accelerations.zero();
         self.gravity
             .calculate_accelerations(bodies, &mut self.accelerations);
-        for (i, body) in bodies.iter_mut().enumerate() {
-            body.velocity += self.accelerations[i] * self.time_step;
-            body.position += body.velocity * self.time_step;
+
+        let dt = self.time_step;
+        let n = bodies.len();
+
+        let ax = &self.accelerations.ax;
+        let ay = &self.accelerations.ay;
+        let az = &self.accelerations.az;
+
+        let vx = &mut bodies.vel_x;
+        let vy = &mut bodies.vel_y;
+        let vz = &mut bodies.vel_z;
+
+        let rx = &mut bodies.pos_x;
+        let ry = &mut bodies.pos_y;
+        let rz = &mut bodies.pos_z;
+
+        // v_(n+1) = v_n + a_n * dt
+        for i in 0..n {
+            vx[i] += ax[i] * dt;
+            vy[i] += ay[i] * dt;
+            vz[i] += az[i] * dt;
+        }
+
+        // r_(n+1) = r_n + v_(n+1) * dt
+        for i in 0..n {
+            rx[i] += vx[i] * dt;
+            ry[i] += vy[i] * dt;
+            rz[i] += vz[i] * dt;
         }
     }
 }

@@ -1,5 +1,5 @@
 use crate::integrators::Integrator;
-use crate::output::BodySnapshot;
+use crate::output::{BodiesSnapshot, BodySnapshot, flatten_bodies_snapshots};
 use glam::DVec3;
 
 #[derive(Clone)]
@@ -18,6 +18,70 @@ impl Body {
             position,
             velocity,
         }
+    }
+}
+
+/// SoA representation of bodies
+pub struct Bodies {
+    pub masses: Vec<f64>,
+    pub pos_x: Vec<f64>,
+    pub pos_y: Vec<f64>,
+    pub pos_z: Vec<f64>,
+    pub vel_x: Vec<f64>,
+    pub vel_y: Vec<f64>,
+    pub vel_z: Vec<f64>,
+}
+
+impl Bodies {
+    pub fn len(&self) -> usize {
+        self.masses.len()
+    }
+}
+
+impl From<&[Body]> for Bodies {
+    fn from(bodies: &[Body]) -> Self {
+        let mut masses = Vec::with_capacity(bodies.len());
+        let mut pos_x = Vec::with_capacity(bodies.len());
+        let mut pos_y = Vec::with_capacity(bodies.len());
+        let mut pos_z = Vec::with_capacity(bodies.len());
+        let mut vel_x = Vec::with_capacity(bodies.len());
+        let mut vel_y = Vec::with_capacity(bodies.len());
+        let mut vel_z = Vec::with_capacity(bodies.len());
+
+        for body in bodies {
+            masses.push(body.mass);
+            pos_x.push(body.position.x);
+            pos_y.push(body.position.y);
+            pos_z.push(body.position.z);
+            vel_x.push(body.velocity.x);
+            vel_y.push(body.velocity.y);
+            vel_z.push(body.velocity.z);
+        }
+
+        Bodies {
+            masses,
+            pos_x,
+            pos_y,
+            pos_z,
+            vel_x,
+            vel_y,
+            vel_z,
+        }
+    }
+}
+
+impl Into<Vec<Body>> for Bodies {
+    fn into(self) -> Vec<Body> {
+        let mut bodies = Vec::with_capacity(self.masses.len());
+        for i in 0..self.masses.len() {
+            bodies.push(Body {
+                id: i,
+                mass: self.masses[i],
+                position: DVec3::new(self.pos_x[i], self.pos_y[i], self.pos_z[i]),
+                velocity: DVec3::new(self.vel_x[i], self.vel_y[i], self.vel_z[i]),
+            });
+        }
+        bodies
     }
 }
 
@@ -81,15 +145,18 @@ impl Simulator {
         // Precompute total results size to avoid memory reallocations
         let num_results = self.bodies.len() * (self.parameters.num_steps + 1);
         let one_percent_steps = (self.parameters.num_steps / 100).max(1);
-        let mut data: Vec<BodySnapshot> = Vec::with_capacity(num_results);
-        let mut time = 0.0;
-        let mut record_state = |bodies: &[Body], time: f64| {
-            data.extend(bodies.iter().map(|body| BodySnapshot::create(body, time)));
-        };
 
+        // Data is a AoSoA where we record a set of body snapshots at each time step,
+        // which will be converted to a flat Vec<BodySnapshot> for output. This avoids
+        // performing conversions from SoA to AoS at each step during the simulation.
+        let mut data_soa: Vec<BodiesSnapshot> = Vec::with_capacity(num_results);
+
+        let mut bodies_soa = Bodies::from(self.bodies.as_slice());
+
+        let mut time = 0.0;
         for step in 0..self.parameters.num_steps {
-            record_state(&self.bodies, time);
-            self.integrator.step(&mut self.bodies);
+            data_soa.push(BodiesSnapshot::from_state(&bodies_soa, time));
+            self.integrator.step(&mut bodies_soa);
             time += self.parameters.time_step;
 
             if self.parameters.progress && step % one_percent_steps == 0 {
@@ -98,8 +165,8 @@ impl Simulator {
         }
 
         // Capture final state
-        record_state(&self.bodies, time);
+        data_soa.push(BodiesSnapshot::from_state(&bodies_soa, time));
 
-        data
+        flatten_bodies_snapshots(&data_soa)
     }
 }

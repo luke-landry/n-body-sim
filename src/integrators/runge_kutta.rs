@@ -1,6 +1,10 @@
 use glam::DVec3;
 
-use crate::{gravity::Gravity, integrators::Integrator, simulation::Body};
+use crate::{
+    gravity::Gravity,
+    integrators::Integrator,
+    simulation::{Bodies, Body},
+};
 
 pub struct RungeKuttaIntegrator {
     gravity: Box<dyn Gravity>,
@@ -81,7 +85,7 @@ impl RungeKuttaIntegrator {
 */
 
 impl Integrator for RungeKuttaIntegrator {
-    fn step(&mut self, bodies: &mut [Body]) {
+    fn step(&mut self, bodies: &mut Bodies) {
         // TODO iterations like below should be optimized in the future
         // by using struct of arrays (SoA) instead of array of structs (AoS)
         // since it would allow very simple element-wise operations on vectors

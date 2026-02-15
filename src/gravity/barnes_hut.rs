@@ -1,3 +1,4 @@
+use crate::{gravity::Accelerations, simulation::Bodies};
 use glam::DVec3;
 
 use crate::{gravity::Gravity, simulation::Body};
@@ -19,7 +20,7 @@ impl BarnesHutGravity {
 }
 
 impl Gravity for BarnesHutGravity {
-    fn calculate_accelerations(&self, bodies: &[Body], accelerations: &mut [DVec3]) {
+    fn calculate_accelerations(&self, bodies: &Bodies, accelerations: &mut Accelerations) {
         // to be implemented
     }
 }
