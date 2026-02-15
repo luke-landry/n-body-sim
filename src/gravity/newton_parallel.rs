@@ -1,5 +1,5 @@
-use crate::gravity::Gravity;
 use crate::gravity::newton::compute_acceleration_for_body;
+use crate::gravity::Gravity;
 use rayon::prelude::*;
 
 pub struct NewtonParallelGravity {
@@ -41,15 +41,14 @@ impl Gravity for NewtonParallelGravity {
     ) {
         let n = masses.len();
         let g = self.g_constant;
-        let eps2 = self.softening_factor.powi(2);
+        let eps2 = self.softening_factor * self.softening_factor;
 
         ax.par_iter_mut()
             .zip(ay.par_iter_mut())
             .zip(az.par_iter_mut())
             .enumerate()
             .for_each(|(i, ((ax_i, ay_i), az_i))| {
-                (*ax_i, *ay_i, *az_i) =
-                    compute_acceleration_for_body(i, n, g, eps2, masses, rx, ry, rz);
+                compute_acceleration_for_body(i, n, g, eps2, masses, rx, ry, rz, ax_i, ay_i, az_i);
             });
     }
 }
