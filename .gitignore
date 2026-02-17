@@ -5,3 +5,4 @@ data/*
 !data/examples/
 scripts/__pycache__/
 n-body-sim*
+*.old

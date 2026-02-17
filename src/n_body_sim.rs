@@ -21,7 +21,7 @@ impl NBodySim {
             args.progress,
         );
 
-        let gravity = args.gravity.create(&parameters);
+        let gravity = args.gravity.create(&parameters, bodies.len());
         let integrator = args
             .integrator
             .create(gravity, parameters.time_step, bodies.len());

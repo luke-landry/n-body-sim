@@ -49,7 +49,7 @@ fn create_simulation(
         theta: args.theta,
         progress: args.progress,
     };
-    let gravity = gravity_method.create(&parameters);
+    let gravity = gravity_method.create(&parameters, bodies.len());
     let integrator = integrator_method.create(gravity, parameters.time_step, bodies.len());
     Simulator::new(bodies, parameters, integrator)
 }

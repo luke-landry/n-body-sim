@@ -68,7 +68,7 @@ impl NewtonGravity {
 */
 impl Gravity for NewtonGravity {
     fn calculate_accelerations(
-        &self,
+        &mut self,
         masses: &[f64],
         rx: &[f64],
         ry: &[f64],
@@ -98,21 +98,25 @@ pub fn compute_acceleration_for_body(
     rz: &[f64],
 ) -> (f64, f64, f64) {
     let n = masses.len();
+    let rx_i = rx[i];
+    let ry_i = ry[i];
+    let rz_i = rz[i];
     let mut ax_i = 0.0;
     let mut ay_i = 0.0;
     let mut az_i = 0.0;
     // split the loop into two to avoid the if statement for
     //      if j != i { continue; }
     // to avoid branching in a single loop
+    // TODO verify performance
     for j in 0..i {
         accumulate_acceleration(
-            g, eps2, masses[j], rx[j], ry[j], rz[j], rx[i], ry[i], rz[i], &mut ax_i, &mut ay_i,
+            g, eps2, masses[j], rx[j], ry[j], rz[j], rx_i, ry_i, rz_i, &mut ax_i, &mut ay_i,
             &mut az_i,
         );
     }
     for j in (i + 1)..n {
         accumulate_acceleration(
-            g, eps2, masses[j], rx[j], ry[j], rz[j], rx[i], ry[i], rz[i], &mut ax_i, &mut ay_i,
+            g, eps2, masses[j], rx[j], ry[j], rz[j], rx_i, ry_i, rz_i, &mut ax_i, &mut ay_i,
             &mut az_i,
         );
     }
