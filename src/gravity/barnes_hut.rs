@@ -1,53 +1,27 @@
-use crate::gravity::Gravity;
+use crate::gravity::{Gravity, barnes_hut::octree::BarnesHutOctree};
 use rayon::prelude::*;
-// This module uses the similarly named barnes_hut crate by
-// David-OConnor for the Barnes-Hut algorithm implementation
-use barnes_hut::{self, BhConfig, BodyModel, Cube, Tree};
+
+pub mod octree;
 
 pub struct BarnesHutGravity {
     g_constant: f64,
     softening_factor: f64,
-    bh_config: BhConfig,
+    octree: BarnesHutOctree,
 }
 
 impl BarnesHutGravity {
-    pub fn new(g_constant: f64, softening_factor: f64, theta: f64) -> Self {
+    pub fn new(g_constant: f64, softening_factor: f64, theta: f64, n: usize) -> Self {
         BarnesHutGravity {
             g_constant: g_constant,
             softening_factor: softening_factor,
-            bh_config: BhConfig {
-                θ: theta,
-                ..BhConfig::default()
-            },
+            octree: BarnesHutOctree::new(n, theta, 1), // TODO configurable max_leaf_size
         }
-    }
-}
-
-struct BodyRef<'a> {
-    masses: &'a [f64],
-    pos_x: &'a [f64],
-    pos_y: &'a [f64],
-    pos_z: &'a [f64],
-    index: usize,
-}
-
-impl<'a> barnes_hut::BodyModel for BodyRef<'a> {
-    fn posit(&self) -> lin_alg::f64::Vec3 {
-        lin_alg::f64::Vec3::new(
-            self.pos_x[self.index],
-            self.pos_y[self.index],
-            self.pos_z[self.index],
-        )
-    }
-
-    fn mass(&self) -> f64 {
-        self.masses[self.index]
     }
 }
 
 impl Gravity for BarnesHutGravity {
     fn calculate_accelerations(
-        &self,
+        &mut self,
         masses: &[f64],
         rx: &[f64],
         ry: &[f64],
@@ -56,68 +30,29 @@ impl Gravity for BarnesHutGravity {
         ay: &mut [f64],
         az: &mut [f64],
     ) {
-        // The barnes_hut crate expects an AoS format, so we create a vector of
-        // BodyRef wrappers that reference the original SoA data
-        let bodies: Vec<BodyRef> = (0..masses.len())
-            .map(|i| BodyRef {
-                masses: masses,
-                pos_x: rx,
-                pos_y: ry,
-                pos_z: rz,
-                index: i,
-            })
-            .collect();
-
-        // bounding box for the tree, with 0 padding and no z-offset
-        let bb = Cube::from_bodies(&bodies, 0.0, false)
-            .expect("barnes_hut: Cube::from_bodies: bodies must not be empty");
-
-        let tree = Tree::new(&bodies, &bb, &self.bh_config);
-
+        let g = self.g_constant;
         let eps2 = self.softening_factor * self.softening_factor;
-
-        // barnes_hut takes a function that computes the acceleration contribution from a source body
-        // on a target body, given the relative position and mass of the source body
-        let acc_fn = |acc_dir: lin_alg::f64::Vec3, m_j, dist| -> lin_alg::f64::Vec3 {
-            compute_acceleration(self.g_constant, eps2, m_j, acc_dir, dist)
+        let acceleration_function = |m: f64, dx: f64, dy: f64, dz: f64| -> (f64, f64, f64) {
+            compute_acceleration(g, eps2, m, dx, dy, dz)
         };
 
+        self.octree.build(masses, rx, ry, rz);
         ax.par_iter_mut()
             .zip(ay.par_iter_mut())
             .zip(az.par_iter_mut())
             .enumerate()
             .for_each(|(i, ((ax_i, ay_i), az_i))| {
-                let accel =
-                    barnes_hut::run_bh(bodies[i].posit(), i, &tree, &self.bh_config, &acc_fn);
-                *ax_i = accel.x;
-                *ay_i = accel.y;
-                *az_i = accel.z;
+                (*ax_i, *ay_i, *az_i) = self
+                    .octree
+                    .compute_acceleration_for_body(i, acceleration_function);
             });
     }
 }
 
-// Computes acceleration contribution from a source body j on a target body i,
-// given the relative position (dx, dy, dz) and mass m_j of the source body with
-// the formulas:
-//      a_ix += k*∆x
-//      a_iy += k*∆y
-//      a_iz += k*∆z
-// where
-//      k = (G * m_j) / (r^2 + ε^2)^(3/2)
-fn compute_acceleration(
-    g: f64,
-    eps2: f64,
-    m_j: f64,
-    acc_dir: lin_alg::f64::Vec3,
-    dist: f64,
-) -> lin_alg::f64::Vec3 {
-    let r2 = dist * dist;
+fn compute_acceleration(g: f64, eps2: f64, m_j: f64, dx: f64, dy: f64, dz: f64) -> (f64, f64, f64) {
+    let r2 = (dx * dx) + (dy * dy) + (dz * dz);
     let inv_r_softened = 1.0 / (r2 + eps2).sqrt();
     let inv_r_softened_cubed = inv_r_softened * inv_r_softened * inv_r_softened;
     let k = g * m_j * inv_r_softened_cubed;
-    lin_alg::f64::Vec3::new(
-        k * acc_dir.x * dist, // ax = k*∆x where ∆x = acc_dir.x * dist
-        k * acc_dir.y * dist, // ay = k*∆y where ∆y = acc_dir.y * dist
-        k * acc_dir.z * dist, // az = k*∆z where ∆z = acc_dir.z * dist
-    )
+    (k * dx, k * dy, k * dz)
 }

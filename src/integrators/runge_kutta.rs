@@ -159,7 +159,7 @@ impl Integrator for RungeKuttaIntegrator {
         self.k1.rz.copy_from_slice(&bodies.vel_z);
 
         // 2. k1_v = compute_acceleration(r_n)
-        compute_acceleration(&*self.gravity, bodies, &mut self.k1.v);
+        compute_acceleration(&mut *self.gravity, bodies, &mut self.k1.v);
 
         {
             let (_, _, _, _, vx, vy, vz) = bodies.as_slices();
@@ -191,7 +191,7 @@ impl Integrator for RungeKuttaIntegrator {
             }
 
             // 4. k2_v = compute_acceleration(r_n + (dt/2)*k1_r)
-            compute_acceleration(&*self.gravity, &self.temp_bodies, &mut self.k2.v);
+            compute_acceleration(&mut *self.gravity, &self.temp_bodies, &mut self.k2.v);
         }
         {
             let (_, _, _, _, vx, vy, vz) = bodies.as_slices();
@@ -223,7 +223,7 @@ impl Integrator for RungeKuttaIntegrator {
             }
 
             // 6. k3_v = compute_acceleration(r_n + (dt/2)*k2_r)
-            compute_acceleration(&*self.gravity, &self.temp_bodies, &mut self.k3.v);
+            compute_acceleration(&mut *self.gravity, &self.temp_bodies, &mut self.k3.v);
         }
         {
             let (_, _, _, _, vx, vy, vz) = bodies.as_slices();
@@ -255,7 +255,7 @@ impl Integrator for RungeKuttaIntegrator {
             }
 
             // 8. k4_v = compute_acceleration(r_n + dt*k3_r)
-            compute_acceleration(&*self.gravity, &self.temp_bodies, &mut self.k4.v);
+            compute_acceleration(&mut *self.gravity, &self.temp_bodies, &mut self.k4.v);
         }
 
         let (_, rx, ry, rz, vx, vy, vz) = bodies.as_slices_mut();

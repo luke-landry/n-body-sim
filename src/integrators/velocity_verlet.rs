@@ -73,7 +73,7 @@ impl Integrator for VelocityVerletIntegrator {
         // to bodies in calculate_accelerations and the r and v variables
         {
             // 1. a_n = compute_acceleration(r_n)
-            compute_acceleration(&*self.gravity, bodies, &mut self.accelerations_current);
+            compute_acceleration(&mut *self.gravity, bodies, &mut self.accelerations_current);
 
             let (ax, ay, az) = self.accelerations_current.as_slices();
             let (_, rx, ry, rz, vx, vy, vz) = bodies.as_slices_mut();
@@ -87,7 +87,7 @@ impl Integrator for VelocityVerletIntegrator {
         }
         {
             // 3. a_(n+1) = compute_acceleration(r_(n+1))
-            compute_acceleration(&*self.gravity, bodies, &mut self.accelerations_next);
+            compute_acceleration(&mut *self.gravity, bodies, &mut self.accelerations_next);
 
             let (ax, ay, az) = self.accelerations_current.as_slices();
             let (ax_next, ay_next, az_next) = self.accelerations_next.as_slices();

@@ -7,7 +7,7 @@ pub trait Gravity {
     /// heap allocation on every step by allowing buffer reuse in the main simulation loop.
     /// The accelerations buffer must be zeroed before each call to this function.
     fn calculate_accelerations(
-        &self,
+        &mut self,
         masses: &[f64],
         rx: &[f64],
         ry: &[f64],

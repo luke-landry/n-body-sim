@@ -30,7 +30,7 @@ impl NewtonParallelGravity {
 */
 impl Gravity for NewtonParallelGravity {
     fn calculate_accelerations(
-        &self,
+        &mut self,
         masses: &[f64],
         rx: &[f64],
         ry: &[f64],

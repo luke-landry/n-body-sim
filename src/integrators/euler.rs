@@ -60,7 +60,7 @@ impl Integrator for EulerIntegrator {
         let dt = self.time_step;
 
         // 1. a_n = compute_acceleration(r_n)
-        compute_acceleration(&*self.gravity, bodies, &mut self.accelerations);
+        compute_acceleration(&mut *self.gravity, bodies, &mut self.accelerations);
 
         let (ax, ay, az) = self.accelerations.as_mut_slices();
         let (_, rx, ry, rz, vx, vy, vz) = bodies.as_slices_mut();

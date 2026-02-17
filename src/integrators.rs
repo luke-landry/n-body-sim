@@ -31,7 +31,7 @@ impl Accelerations {
 
 /// Computes the accelerations for all bodies based on their positions and masses using the provided gravity model
 pub fn compute_acceleration(
-    gravity: &dyn Gravity,
+    gravity: &mut dyn Gravity,
     bodies: &Bodies,
     accelerations: &mut Accelerations,
 ) {

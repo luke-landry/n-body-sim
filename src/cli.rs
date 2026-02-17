@@ -86,7 +86,7 @@ pub enum GravityMethod {
 }
 
 impl GravityMethod {
-    pub fn create(&self, parameters: &Parameters) -> Box<dyn Gravity> {
+    pub fn create(&self, parameters: &Parameters, n: usize) -> Box<dyn Gravity> {
         match self {
             GravityMethod::Newton => Box::new(NewtonGravity::new(
                 parameters.g_constant,
@@ -100,6 +100,7 @@ impl GravityMethod {
                 parameters.g_constant,
                 parameters.softening_factor,
                 parameters.theta,
+                n,
             )),
         }
     }
