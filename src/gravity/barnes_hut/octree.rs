@@ -1,3 +1,5 @@
+// See /docs/barnes_hut_octree.md for design notes and implementation details.
+
 /// SoA Barnes-Hut Octree
 pub struct BarnesHutOctree {
     pub theta: f64, // opening angle threshold for Barnes-Hut approximation
@@ -76,7 +78,7 @@ impl BarnesHutOctree {
         self.body_pos_x.copy_from_slice(rx);
         self.body_pos_y.copy_from_slice(ry);
         self.body_pos_z.copy_from_slice(rz);
-        self.body_permutations = morton_sort_bodies(
+        (self.body_permutations, self.body_sorted_morton_codes) = morton_sort_bodies(
             &mut self.body_masses,
             &mut self.body_pos_x,
             &mut self.body_pos_y,
@@ -98,36 +100,56 @@ impl BarnesHutOctree {
         (0.0, 0.0, 0.0)
     }
 
+    /*
+
+    */
+
+    /// Recursively builds the octree by computing node indices and per-node body tracking information
     fn build_recursive(
         &mut self,
-        bodies_range_start: usize,
-        bodies_range_end: usize,
+        bodies_range_start_idx: usize,
+        bodies_range_end_idx: usize,
         bit_level: i32,
     ) -> u32 {
         let node_idx = self.create_new_node();
-        let num_bodies = bodies_range_end - bodies_range_start;
+        let num_bodies = bodies_range_end_idx - bodies_range_start_idx;
 
         // base case: leaf node
         if num_bodies <= self.max_leaf_size || bit_level < 0 {
-            self.node_bodies_start[node_idx] = bodies_range_start as u32;
+            self.node_bodies_start[node_idx] = bodies_range_start_idx as u32;
             self.node_bodies_count[node_idx] = num_bodies as u32;
             return node_idx as u32;
         }
 
-        // recursive case: internal node (8 children)
-        let mut current_search_start = bodies_range_start;
+        // recursive case: internal node (split into up to 8 children)
+        let mut current_search_start_idx = bodies_range_start_idx;
         for child_id in 0..8 {
-            let child_range_end =
-                self.find_split_point(current_search_start, bodies_range_end, bit_level, child_id);
+            let child_range_end_idx = self.find_split_point(
+                current_search_start_idx,
+                bodies_range_end_idx,
+                bit_level,
+                child_id,
+            );
 
-            // only create a child node if there are bodies in this child's range
-            if child_range_end > current_search_start {
-                let child_node_idx =
-                    self.build_recursive(current_search_start, child_range_end, bit_level - 1);
-                self.node_children_start_idx[node_idx] = child_node_idx + child_id as u32;
+            // if there are no bodies in the potential child's range, child_range_end_idx == current_search_start_idx,
+            // so only creating a child node if there are bodies in this child's range
+            if child_range_end_idx > current_search_start_idx {
+                let child_node_idx = self.build_recursive(
+                    current_search_start_idx,
+                    child_range_end_idx,
+                    bit_level - 1,
+                );
+
+                if self.node_children_start_idx[node_idx] == u32::MAX {
+                    // first child for this node, set the start index
+                    self.node_children_start_idx[node_idx] = child_node_idx;
+                }
+
+                // set the bit corresponding to this child_id to indicate that this child exists
+                self.node_children_masks[node_idx] |= 1 << child_id;
             }
 
-            current_search_start = child_range_end;
+            current_search_start_idx = child_range_end_idx;
         }
 
         node_idx as u32
@@ -205,13 +227,15 @@ fn quantize_f64_to_u64(val: f64, min: f64, width: f64) -> u64 {
     (normalized * (1 << 21) as f64) as u64
 }
 
-/// Sorts SoA bodies by morton code order and returns an array with the mapping from sorted to original indices
+/// Sorts SoA bodies by morton code order and returns
+///  - a permutation array with the mapping from sorted to original indices
+///  - the sorted morton codes for each body
 fn morton_sort_bodies(
     masses: &mut [f64],
     pos_x: &mut [f64],
     pos_y: &mut [f64],
     pos_z: &mut [f64],
-) -> Vec<usize> {
+) -> (Vec<usize>, Vec<u64>) {
     let n = masses.len();
     let (min_x, min_y, min_z, root_width) = find_bounding_box(pos_x, pos_y, pos_z);
     let mut morton_codes_and_idx: Vec<(u64, usize)> = (0..n)
@@ -226,8 +250,10 @@ fn morton_sort_bodies(
     morton_codes_and_idx.sort_unstable(); // TODO look into radix sort here
 
     let mut permutations = Vec::with_capacity(n);
-    for (_, idx) in morton_codes_and_idx {
-        permutations.push(idx);
+    let mut sorted_morton_codes = Vec::with_capacity(n);
+    for (code, idx) in morton_codes_and_idx.iter() {
+        sorted_morton_codes.push(*code);
+        permutations.push(*idx);
     }
 
     let mut scratch = Vec::with_capacity(n); // reused to avoid repeated vector creations
@@ -245,7 +271,7 @@ fn morton_sort_bodies(
     reorder(pos_y);
     reorder(pos_z);
 
-    permutations
+    (permutations, sorted_morton_codes)
 }
 
 // Loop-based implementation of morton_encode for reference
