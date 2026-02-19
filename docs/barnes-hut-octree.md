@@ -113,3 +113,5 @@ CB, CBAL, CBBL]
 where each node stores the start index of its children in the node array (e.g. root would store 1 since its first child A is at index 1).
 
 So, to track the nodes, we need to store the node's start index, and which of its children exist. Since the children $0..7$ of a node will be contiguous in the node arrays, we can just store the start index of the first child, and a bitmask indicating which children exist. From that information we can determine which children exist and what their offset from the start index is, and thus we can compute all child node indices.
+
+This data structure allows us to build the octree recursively in a depth-first manner, where we start with the root node (which corresponds to the entire range of bodies), and then for each node, we check if it contains more than $C$ bodies. If it does, we subdivide it into up to 8 children and then recursively build the octree for each child node. During the recursive construction, each node will compute it's own mass and CoM from the masses and CoMs of its children. For leaf nodes, the mass and CoM is computed from the bodies it contains.
