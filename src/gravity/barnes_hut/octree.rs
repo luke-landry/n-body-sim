@@ -9,7 +9,6 @@
 pub struct BarnesHutOctree {
     theta: f64, // threshold for Barnes-Hut approximation
     max_leaf_size: usize,
-    max_nodes: usize,
     node_count: usize,
 
     // bodies
@@ -36,6 +35,16 @@ pub struct BarnesHutOctree {
     node_com_z: Vec<f64>,
     node_widths: Vec<f64>,
 
+    // per-node indices of children during tree construction, will be flattened into flat_node_children after construction
+    node_children: Vec<Vec<usize>>,
+    node_children_count: Vec<usize>,
+
+    /// Points to the start and length of the block in the sorted body arrays.
+    /// Due to Morton code sorting, all bodies in the same node will be
+    /// in [node_bodies_start[i], node_bodies_start[i]+node_bodies_count[i]) in the body arrays.
+    node_bodies_start: Vec<usize>,
+    node_bodies_count: Vec<usize>,
+
     /// Flattened list of sorted children node indices, where the children of each node are stored contiguously,
     /// and the start index of each node's children in this array is given by node_children_start_idx.
     flat_node_children: Vec<usize>,
@@ -43,18 +52,6 @@ pub struct BarnesHutOctree {
     /// flat_node_children_start_idx[i] points to the first of the contiguous existing children of node i in the node arrays.
     /// If a node is a leaf, then usize::MAX is used as a sentinel value to indicate that it has no children.
     flat_node_children_start_idx: Vec<usize>,
-    node_children_count: Vec<usize>,
-
-    /// points to the start and length of the block in the sorted body arrays
-    /// due to Morton code sorting, all bodies in the same node will be
-    /// in [node_bodies_start[i], node_bodies_start[i]+node_bodies_count[i]) in the body arrays.
-    node_bodies_start: Vec<usize>,
-    node_bodies_count: Vec<usize>,
-
-    /// Stores the nodes at each level of the the tree as they are created depth-first recursively
-    /// during three construction. This can then be flattened to create the flat_node_children array,
-    /// which stores the children of each node contiguously for better cache performance during tree traversal.
-    flat_node_children_levels: Vec<Vec<usize>>,
 }
 
 impl BarnesHutOctree {
@@ -76,7 +73,6 @@ impl BarnesHutOctree {
         Self {
             theta: theta,
             max_leaf_size: max_leaf_size, // can be tuned for performance
-            max_nodes: max_nodes,
             node_count: 0,
 
             // body properties
@@ -94,13 +90,13 @@ impl BarnesHutOctree {
             node_com_y: vec![0.0; max_nodes],
             node_com_z: vec![0.0; max_nodes],
             node_widths: vec![0.0; max_nodes],
-            flat_node_children: Vec::with_capacity(max_nodes), // reserving with capacity because this will be pushed to this during tree construction
-            flat_node_children_start_idx: vec![usize::MAX; max_nodes], // usize::max as sentinel value for leaf nodes
+            node_children: vec![Vec::with_capacity(8); max_nodes], // each node can have up to 8 children in an octree
             node_children_count: vec![0; max_nodes],
             node_bodies_start: vec![usize::MAX; max_nodes], // usize::max as sentinel value (should never be encountered for non-existent nodes)
             node_bodies_count: vec![0; max_nodes],
 
-            flat_node_children_levels: vec![Vec::with_capacity(max_nodes); Self::MAX_DEPTH],
+            flat_node_children: Vec::with_capacity(max_nodes), // reserving with capacity because this will be pushed to this during tree construction
+            flat_node_children_start_idx: vec![usize::MAX; max_nodes], // usize::max as sentinel value for leaf nodes
         }
     }
 
@@ -132,59 +128,13 @@ impl BarnesHutOctree {
 
         self.build_recursive(0, masses.len(), Self::MAX_DEPTH, root_width);
 
-        // start at node_count and count down to flatten from "bottom-up" and to drain from end of
-        // flat_node_children instead of start (O(k) vs O(n) vector element removal)
-        let mut node_idx: usize = self.node_count - 1;
-
-        // Flatten the flat_node_children_levels into flat_node_children
-        // and fill in flat_node_children_start_idx for each node
-        for level in self.flat_node_children_levels.iter_mut() {
-            // drain level into nodes until we have processed all nodes in this level
-            while level.len() > 0 {
+        // Flatten the node_children into flat_node_children and set flat_node_children_start_idx
+        for node_idx in 0..self.node_count {
+            let children = &self.node_children[node_idx];
+            if !children.is_empty() {
                 self.flat_node_children_start_idx[node_idx] = self.flat_node_children.len();
-
-                if self.node_children_count[node_idx] > level.len() {
-                    panic!(
-                        "Error flattening flat_node_children_levels: node {} has {} children, but only {} nodes remaining in this level",
-                        node_idx,
-                        self.node_children_count[node_idx],
-                        level.len()
-                    );
-                }
-
-                // drain last node_children_count[node_idx] elements from level into
-                // flat_node_children as the children of this node
-                let drain_start_idx = level.len() - self.node_children_count[node_idx];
-
-                self.flat_node_children
-                    .extend(level.drain(drain_start_idx..));
-
-                if node_idx == 0 {
-                    break;
-                }
-
-                node_idx -= 1;
+                self.flat_node_children.extend_from_slice(children);
             }
-
-            // usize::MAX is used as a sentinel value to indicate that a node does not have a child at this level,
-            // so if there are any remaining nodes in this level after processing, it means not all nodes were processed correctly
-            if level.iter().any(|&node_idx| node_idx != usize::MAX) {
-                panic!(
-                    "Error flattening flat_node_children_levels: not all nodes in this level were processed. Remaining nodes in level: {:?}",
-                    level
-                        .iter()
-                        .filter(|&&idx| idx != usize::MAX)
-                        .collect::<Vec<_>>()
-                );
-            }
-        }
-
-        if node_idx != 0 {
-            panic!(
-                "Error flattening flat_node_children_levels: not all nodes were processed. Processed node count: {}, total node count: {}",
-                self.node_count - node_idx,
-                self.node_count
-            );
         }
     }
 
@@ -204,6 +154,18 @@ impl BarnesHutOctree {
         let target_body_pos_y = self.body_pos_y[target_body_morton_idx];
         let target_body_pos_z = self.body_pos_z[target_body_morton_idx];
 
+        #[cfg(test)]
+        {
+            println!(
+                "Computing acceleration for body {}: morton_idx={}, pos=({}, {}, {})",
+                target_body_idx,
+                target_body_morton_idx,
+                target_body_pos_x,
+                target_body_pos_y,
+                target_body_pos_z
+            );
+        }
+
         // using iteration for tree traversal instead of recursion for better performance
         let mut stack = vec![0]; // start with root node index on the stack
 
@@ -214,6 +176,25 @@ impl BarnesHutOctree {
             let node_distance_squared = node_dx * node_dx + node_dy * node_dy + node_dz * node_dz;
             if node_distance_squared == 0.0 {
                 continue; // skip interaction with mass at the same position to avoid singularity
+            }
+
+            #[cfg(test)]
+            {
+                let bh_ratio = self.node_widths[node_idx] / node_distance_squared.sqrt();
+                println!(
+                    "Visiting node {}: node_com=({}, {}, {}), node_mass={}, node_width={}, distance={}, BH ratio={}, theta={}, leaf={}, num_bodies_in_node={}",
+                    node_idx,
+                    self.node_com_x[node_idx],
+                    self.node_com_y[node_idx],
+                    self.node_com_z[node_idx],
+                    self.node_masses[node_idx],
+                    self.node_widths[node_idx],
+                    node_distance_squared.sqrt(),
+                    bh_ratio,
+                    self.theta,
+                    self.node_children_count[node_idx] == 0,
+                    self.node_bodies_count[node_idx],
+                );
             }
 
             // If node is a leaf
@@ -258,6 +239,21 @@ impl BarnesHutOctree {
                 ax += dax;
                 ay += day;
                 az += daz;
+
+                #[cfg(test)]
+                {
+                    println!(
+                        "\tApproximated node {} as single mass:\n\t\twidth={}, distance={}, theta={}, node_mass={}, node_com=({}, {}, {})",
+                        node_idx,
+                        self.node_widths[node_idx],
+                        node_distance_squared.sqrt(),
+                        self.theta,
+                        self.node_masses[node_idx],
+                        self.node_com_x[node_idx],
+                        self.node_com_y[node_idx],
+                        self.node_com_z[node_idx],
+                    );
+                }
             }
             // If node is an internal node, traverse its children
             else {
@@ -312,7 +308,6 @@ impl BarnesHutOctree {
         }
 
         // recursive case: internal node (split into child nodes)
-        let mut children_count = 0;
         let mut child_current_body_idx = bodies_range_start_idx;
         let shift = ((bit_level - 1) * 3) as u32;
         while child_current_body_idx < bodies_range_end_idx {
@@ -346,23 +341,19 @@ impl BarnesHutOctree {
                     bit_level - 1,
                     width * 0.5,
                 );
-                // safe to decrement bit_level here since we check for bit_level > 0 in the base case condition
-                self.flat_node_children_levels[bit_level - 1].push(child_node_idx);
-                children_count += 1;
+                self.node_children[node_idx].push(child_node_idx);
             }
 
             child_current_body_idx = child_bodies_range_end_idx;
         }
 
-        self.node_children_count[node_idx] = children_count;
+        let node_children = &self.node_children[node_idx];
+        let node_children_count = node_children.len();
 
-        // the start index of this node's children is the current length of node_children_level
-        // minus the number of children we just added.
-        let node_children_level = &self.flat_node_children_levels[bit_level - 1];
-        let node_children = &node_children_level[node_children_level.len() - children_count..];
+        self.node_children_count[node_idx] = node_children_count;
 
         // Aggregate mass/COM from children
-        let (mass, com_x, com_y, com_z) = if children_count > 0 {
+        let (mass, com_x, com_y, com_z) = if node_children_count > 0 {
             self.compute_com_of_node_indices(&node_children)
         } else {
             (0.0, 0.0, 0.0, 0.0)
@@ -377,8 +368,8 @@ impl BarnesHutOctree {
         #[cfg(test)]
         {
             println!(
-                "Node {} (internal): bit_level={}, num_bodies={}, children_count={}, mass={}, com=({}, {}, {})",
-                node_idx, bit_level, num_bodies, children_count, mass, com_x, com_y, com_z
+                "Node {} (internal): bit_level={}, num_bodies={}, node_children_count={}, mass={}, com=({}, {}, {})",
+                node_idx, bit_level, num_bodies, node_children_count, mass, com_x, com_y, com_z
             );
             println!(
                 "\tChildren indices {:?}, Bodies range [{}, {})",
@@ -407,15 +398,14 @@ impl BarnesHutOctree {
         self.node_com_y.fill(0.0);
         self.node_com_z.fill(0.0);
         self.node_widths.fill(0.0);
-        self.flat_node_children.clear();
-        self.flat_node_children_start_idx.fill(usize::MAX);
+        self.node_children
+            .iter_mut()
+            .for_each(|children| children.clear());
         self.node_children_count.fill(0);
         self.node_bodies_start.fill(usize::MAX);
         self.node_bodies_count.fill(0);
-
-        self.flat_node_children_levels
-            .fill(Vec::with_capacity(self.max_nodes));
-
+        self.flat_node_children.clear();
+        self.flat_node_children_start_idx.fill(usize::MAX);
         self.node_count = 0;
     }
 
