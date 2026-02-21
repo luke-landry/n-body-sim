@@ -1,48 +1,67 @@
-// See /docs/barnes_hut_octree.md for design notes and implementation details.
+/*
+   Implementation of a Barnes-Hut octree for 3D N-body simulations
+   using a Structure of Arrays (SoA) data layout with morton code ordering.
+
+   See /docs/barnes_hut_octree.md for design notes
+*/
 
 /// SoA Barnes-Hut Octree
 pub struct BarnesHutOctree {
-    pub theta: f64, // opening angle threshold for Barnes-Hut approximation
-    pub max_leaf_size: usize,
+    theta: f64, // threshold for Barnes-Hut approximation
+    max_leaf_size: usize,
+    max_nodes: usize,
+    node_count: usize,
 
     // bodies
-    pub body_masses: Vec<f64>,
-    pub body_pos_x: Vec<f64>,
-    pub body_pos_y: Vec<f64>,
-    pub body_pos_z: Vec<f64>,
+    body_masses: Vec<f64>,
+    body_pos_x: Vec<f64>,
+    body_pos_y: Vec<f64>,
+    body_pos_z: Vec<f64>,
 
-    // cache of the sorted morton codes for each body
-    pub body_sorted_morton_codes: Vec<u64>,
+    /// cache of the sorted morton codes for each body
+    body_sorted_morton_codes: Vec<u64>,
 
-    // permutation array storing the mapping from morton sorted body index to original body index
-    pub body_permutations: Vec<usize>,
+    /// array storing the mapping from sorted body index to original body index
+    /// original_to_morton_idx[original_idx] = morton_idx
+    original_to_morton_idx: Vec<usize>,
+
+    /// array storing the mapping from morton sorted body index to original body index
+    /// morton_to_original_idx[morton_idx] = original_idx
+    morton_to_original_idx: Vec<usize>,
 
     // nodes
-    pub node_masses: Vec<f64>,
-    pub node_com_x: Vec<f64>,
-    pub node_com_y: Vec<f64>,
-    pub node_com_z: Vec<f64>,
-    pub node_widths: Vec<f64>,
+    node_masses: Vec<f64>,
+    node_com_x: Vec<f64>,
+    node_com_y: Vec<f64>,
+    node_com_z: Vec<f64>,
+    node_widths: Vec<f64>,
 
-    // Flattened list of all children for all nodes, where the children of each node are stored contiguously,
-    // and the start index of each node's children in this array is given by node_children_start_idx.
-    pub flat_node_children: Vec<usize>, // flattened list of all children for all nodes
+    /// Flattened list of sorted children node indices, where the children of each node are stored contiguously,
+    /// and the start index of each node's children in this array is given by node_children_start_idx.
+    flat_node_children: Vec<usize>,
 
-    // flat_node_children_start_idx[i] points to the first of the contiguous existing children of node i in the node arrays.
-    // If a node is a leaf, then usize::MAX is used as a sentinel value to indicate that it has no children.
-    pub flat_node_children_start_idx: Vec<usize>,
-    pub node_children_count: Vec<usize>, // number of children for each node, can be computed from node_children_masks but stored here for convenience
+    /// flat_node_children_start_idx[i] points to the first of the contiguous existing children of node i in the node arrays.
+    /// If a node is a leaf, then usize::MAX is used as a sentinel value to indicate that it has no children.
+    flat_node_children_start_idx: Vec<usize>,
+    node_children_count: Vec<usize>,
 
-    // points to the start and length of the block in the sorted body arrays
-    // due to Morton code sorting, all bodies in the same node will be
-    // in [node_bodies_start[i], node_bodies_start[i]+node_bodies_count[i]) in the body arrays.
-    pub node_bodies_start: Vec<usize>,
-    pub node_bodies_count: Vec<usize>,
+    /// points to the start and length of the block in the sorted body arrays
+    /// due to Morton code sorting, all bodies in the same node will be
+    /// in [node_bodies_start[i], node_bodies_start[i]+node_bodies_count[i]) in the body arrays.
+    node_bodies_start: Vec<usize>,
+    node_bodies_count: Vec<usize>,
 
-    pub node_count: usize,
+    /// Stores the nodes at each level of the the tree as they are created depth-first recursively
+    /// during three construction. This can then be flattened to create the flat_node_children array,
+    /// which stores the children of each node contiguously for better cache performance during tree traversal.
+    flat_node_children_levels: Vec<Vec<usize>>,
 }
 
 impl BarnesHutOctree {
+    // maximum depth of the octree, determined by the number of bits used
+    // for u64 Morton codes (64 / 3 ~= 21 bits per 3D coordinate for 64-bit Morton codes)
+    const MAX_DEPTH: usize = 21;
+
     // padding is applied to root width to ensure that all bodies are comfortably within the root node,
     // and to prevent edge cases where bodies lie exactly on the boundary of the root node,
     // which could cause issues with Morton code quantization and octree construction.
@@ -50,10 +69,15 @@ impl BarnesHutOctree {
 
     pub fn new(n: usize, theta: f64, max_leaf_size: usize) -> Self {
         // upper bound on the possible number of nodes in the octree
-        let max_nodes = 2 * n - 1;
+        // assuming a maximum depth of 21 since we are using 21 bits per coordinate for the u64 Morton codes
+        // T < (N/C) * (1 + D) where N is the number of bodies, C is the max leaf size, and D is the maximum depth of the tree
+        let max_nodes = (n.div_ceil(max_leaf_size)) * (1 + Self::MAX_DEPTH);
+
         Self {
             theta: theta,
             max_leaf_size: max_leaf_size, // can be tuned for performance
+            max_nodes: max_nodes,
+            node_count: 0,
 
             // body properties
             body_masses: vec![0.0; n],
@@ -61,7 +85,8 @@ impl BarnesHutOctree {
             body_pos_y: vec![0.0; n],
             body_pos_z: vec![0.0; n],
             body_sorted_morton_codes: vec![0; n],
-            body_permutations: vec![0; n],
+            original_to_morton_idx: vec![0; n],
+            morton_to_original_idx: vec![0; n],
 
             // node properties
             node_masses: vec![0.0; max_nodes],
@@ -75,7 +100,7 @@ impl BarnesHutOctree {
             node_bodies_start: vec![usize::MAX; max_nodes], // usize::max as sentinel value (should never be encountered for non-existent nodes)
             node_bodies_count: vec![0; max_nodes],
 
-            node_count: 0,
+            flat_node_children_levels: vec![Vec::with_capacity(max_nodes); Self::MAX_DEPTH],
         }
     }
 
@@ -90,7 +115,11 @@ impl BarnesHutOctree {
         self.body_pos_y.copy_from_slice(ry);
         self.body_pos_z.copy_from_slice(rz);
 
-        (self.body_permutations, self.body_sorted_morton_codes) = morton_sort_bodies(
+        (
+            self.original_to_morton_idx,
+            self.morton_to_original_idx,
+            self.body_sorted_morton_codes,
+        ) = morton_sort_bodies(
             &mut self.body_masses,
             &mut self.body_pos_x,
             &mut self.body_pos_y,
@@ -101,19 +130,146 @@ impl BarnesHutOctree {
             root_width,
         );
 
-        // Start build with root at bit level 20 since we are using u64 morton codes
-        // with 21 bits per coordinate, so the highest bit level is 20 (0-indexed)
-        self.build_recursive(0, masses.len(), 20, root_width);
+        self.build_recursive(0, masses.len(), Self::MAX_DEPTH, root_width);
+
+        // start at node_count and count down to flatten from "bottom-up" and to drain from end of
+        // flat_node_children instead of start (O(k) vs O(n) vector element removal)
+        let mut node_idx: usize = self.node_count - 1;
+
+        // Flatten the flat_node_children_levels into flat_node_children
+        // and fill in flat_node_children_start_idx for each node
+        for level in self.flat_node_children_levels.iter_mut() {
+            // drain level into nodes until we have processed all nodes in this level
+            while level.len() > 0 {
+                self.flat_node_children_start_idx[node_idx] = self.flat_node_children.len();
+
+                if self.node_children_count[node_idx] > level.len() {
+                    panic!(
+                        "Error flattening flat_node_children_levels: node {} has {} children, but only {} nodes remaining in this level",
+                        node_idx,
+                        self.node_children_count[node_idx],
+                        level.len()
+                    );
+                }
+
+                // drain last node_children_count[node_idx] elements from level into
+                // flat_node_children as the children of this node
+                let drain_start_idx = level.len() - self.node_children_count[node_idx];
+
+                self.flat_node_children
+                    .extend(level.drain(drain_start_idx..));
+
+                if node_idx == 0 {
+                    break;
+                }
+
+                node_idx -= 1;
+            }
+
+            // usize::MAX is used as a sentinel value to indicate that a node does not have a child at this level,
+            // so if there are any remaining nodes in this level after processing, it means not all nodes were processed correctly
+            if level.iter().any(|&node_idx| node_idx != usize::MAX) {
+                panic!(
+                    "Error flattening flat_node_children_levels: not all nodes in this level were processed. Remaining nodes in level: {:?}",
+                    level
+                        .iter()
+                        .filter(|&&idx| idx != usize::MAX)
+                        .collect::<Vec<_>>()
+                );
+            }
+        }
+
+        if node_idx != 0 {
+            panic!(
+                "Error flattening flat_node_children_levels: not all nodes were processed. Processed node count: {}, total node count: {}",
+                self.node_count - node_idx,
+                self.node_count
+            );
+        }
     }
 
     pub fn compute_acceleration_for_body<F: Fn(f64, f64, f64, f64) -> (f64, f64, f64)>(
         &self,
-        i: usize,
+        // target body index in the original input order (not morton sorted order)
+        target_body_idx: usize,
         // function for computing acceleration from a single source (mass, dx, dy, dz) -> (ax, ay, az)
         acceleration_function: F,
     ) -> (f64, f64, f64) {
-        // to be implemented
-        (0.0, 0.0, 0.0)
+        let mut ax = 0.0;
+        let mut ay = 0.0;
+        let mut az = 0.0;
+
+        let target_body_morton_idx = self.original_to_morton_idx[target_body_idx];
+        let target_body_pos_x = self.body_pos_x[target_body_morton_idx];
+        let target_body_pos_y = self.body_pos_y[target_body_morton_idx];
+        let target_body_pos_z = self.body_pos_z[target_body_morton_idx];
+
+        // using iteration for tree traversal instead of recursion for better performance
+        let mut stack = vec![0]; // start with root node index on the stack
+
+        while let Some(node_idx) = stack.pop() {
+            let node_dx = self.node_com_x[node_idx] - target_body_pos_x;
+            let node_dy = self.node_com_y[node_idx] - target_body_pos_y;
+            let node_dz = self.node_com_z[node_idx] - target_body_pos_z;
+            let node_distance_squared = node_dx * node_dx + node_dy * node_dy + node_dz * node_dz;
+            if node_distance_squared == 0.0 {
+                continue; // skip interaction with mass at the same position to avoid singularity
+            }
+
+            // If node is a leaf
+            if self.node_children_count[node_idx] == 0 {
+                // compute direct interaction with each body in this leaf node
+                let bodies_start = self.node_bodies_start[node_idx];
+                let bodies_end = bodies_start + self.node_bodies_count[node_idx];
+                for i in bodies_start..bodies_end {
+                    if i == target_body_morton_idx {
+                        continue; // skip self-interaction
+                    }
+                    let source_body_mass = self.body_masses[i];
+                    let source_body_dx = self.body_pos_x[i] - target_body_pos_x;
+                    let source_body_dy = self.body_pos_y[i] - target_body_pos_y;
+                    let source_body_dz = self.body_pos_z[i] - target_body_pos_z;
+                    let (dax, day, daz) = acceleration_function(
+                        source_body_mass,
+                        source_body_dx,
+                        source_body_dy,
+                        source_body_dz,
+                    );
+                    ax += dax;
+                    ay += day;
+                    az += daz;
+                }
+            }
+            /*
+               Barnes-Hut criterion: if the node is sufficiently far away (width / distance < theta),
+               we can approximate the entire node as a single mass at its center of mass.
+
+               Squared calculations here as distance has already been squared:
+               width_squared / distance_squared < theta^2 is equivalent to width / distance < theta
+               given all these values are positive
+            */
+            else if ((self.node_widths[node_idx] * self.node_widths[node_idx])
+                / node_distance_squared)
+                < (self.theta * self.theta)
+            {
+                // case node is sufficiently far away to approximate as a single mass
+                let node_mass = self.node_masses[node_idx];
+                let (dax, day, daz) = acceleration_function(node_mass, node_dx, node_dy, node_dz);
+                ax += dax;
+                ay += day;
+                az += daz;
+            }
+            // If node is an internal node, traverse its children
+            else {
+                let children_start_idx = self.flat_node_children_start_idx[node_idx];
+                let children_count = self.node_children_count[node_idx];
+                let children_end_idx = children_start_idx + children_count;
+                for i in children_start_idx..children_end_idx {
+                    stack.push(self.flat_node_children[i]);
+                }
+            }
+        }
+        (ax, ay, az)
     }
 
     /// Recursively builds the octree by computing node indices and per-node body tracking information
@@ -121,7 +277,7 @@ impl BarnesHutOctree {
         &mut self,
         bodies_range_start_idx: usize,
         bodies_range_end_idx: usize,
-        bit_level: i32,
+        bit_level: usize,
         width: f64,
     ) -> usize {
         let node_idx = self.create_new_node();
@@ -131,7 +287,7 @@ impl BarnesHutOctree {
         self.node_widths[node_idx] = width;
 
         // base case: leaf node
-        if num_bodies <= self.max_leaf_size || bit_level < 0 {
+        if num_bodies <= self.max_leaf_size || bit_level <= 0 {
             let (mass, com_x, com_y, com_z) =
                 self.compute_com_of_bodies_range(bodies_range_start_idx, bodies_range_end_idx);
             self.node_masses[node_idx] = mass;
@@ -155,44 +311,59 @@ impl BarnesHutOctree {
             return node_idx;
         }
 
-        // recursive case: internal node (split into up to 8 children)
+        // recursive case: internal node (split into child nodes)
         let mut children_count = 0;
-        let mut current_search_start_idx = bodies_range_start_idx;
-        for child_id in 0..8 {
-            let child_range_end_idx = self.find_split_point(
-                current_search_start_idx,
-                bodies_range_end_idx,
-                bit_level,
-                child_id,
-            );
+        let mut child_current_body_idx = bodies_range_start_idx;
+        let shift = ((bit_level - 1) * 3) as u32;
+        while child_current_body_idx < bodies_range_end_idx {
+            // the morton code of the first body in this child's range determines which child node we are in (3 bits for 8 children)
+            let child_node_first_body_morton_code =
+                self.body_sorted_morton_codes[child_current_body_idx];
+            let child_node_bit_level_id = (child_node_first_body_morton_code >> shift) & 0b111;
 
-            // if there are no bodies in the potential child's range, child_range_end_idx == current_search_start_idx,
-            // so only creating a child node if there are bodies in this child's range
-            if child_range_end_idx > current_search_start_idx {
+            // finding the end of this child's range by iterating until we find a body that does not belong to this child
+            let mut child_bodies_range_end_idx = child_current_body_idx;
+            while child_bodies_range_end_idx < bodies_range_end_idx {
+                let body_morton_code = self.body_sorted_morton_codes[child_bodies_range_end_idx];
+
+                // Right shift the code to make the 3 LSBs correspond to the given bit_level,
+                // and then mask these LSBs to get the child_id bits (3 bits for 2^3 = 8 children).
+                let body_bit_level_id = (body_morton_code >> shift) & 0b111;
+
+                if body_bit_level_id != child_node_bit_level_id {
+                    // this body does not belong to this child node so we have
+                    // found the end of this child's range
+                    break;
+                }
+                child_bodies_range_end_idx += 1;
+            }
+
+            // only create a child node if there are bodies in this child's range
+            if child_bodies_range_end_idx > child_current_body_idx {
                 let child_node_idx = self.build_recursive(
-                    current_search_start_idx,
-                    child_range_end_idx,
+                    child_current_body_idx,
+                    child_bodies_range_end_idx,
                     bit_level - 1,
                     width * 0.5,
                 );
-                self.flat_node_children.push(child_node_idx);
+                // safe to decrement bit_level here since we check for bit_level > 0 in the base case condition
+                self.flat_node_children_levels[bit_level - 1].push(child_node_idx);
                 children_count += 1;
             }
-            current_search_start_idx = child_range_end_idx;
+
+            child_current_body_idx = child_bodies_range_end_idx;
         }
 
-        // The previous loop pushes the children of this node to the end of flat_node_children,
-        //  the start index of this node's children is the current length of flat_node_children minus the number of children we just added.
-        let children_start = self.flat_node_children.len() - children_count;
-
-        self.flat_node_children_start_idx[node_idx] = children_start;
         self.node_children_count[node_idx] = children_count;
+
+        // the start index of this node's children is the current length of node_children_level
+        // minus the number of children we just added.
+        let node_children_level = &self.flat_node_children_levels[bit_level - 1];
+        let node_children = &node_children_level[node_children_level.len() - children_count..];
 
         // Aggregate mass/COM from children
         let (mass, com_x, com_y, com_z) = if children_count > 0 {
-            let start = children_start;
-            let end = children_start + children_count;
-            self.compute_com_of_node_indices(&self.flat_node_children[start..end])
+            self.compute_com_of_node_indices(&node_children)
         } else {
             (0.0, 0.0, 0.0, 0.0)
         };
@@ -210,12 +381,8 @@ impl BarnesHutOctree {
                 node_idx, bit_level, num_bodies, children_count, mass, com_x, com_y, com_z
             );
             println!(
-                "\tFlat children nodes range [{},{}), Children indices {:?}, Bodies range [{}, {})",
-                children_start,
-                children_start + children_count,
-                &self.flat_node_children[children_start..children_start + children_count],
-                bodies_range_start_idx,
-                bodies_range_end_idx
+                "\tChildren indices {:?}, Bodies range [{}, {})",
+                &node_children, bodies_range_start_idx, bodies_range_end_idx
             );
         }
 
@@ -228,21 +395,27 @@ impl BarnesHutOctree {
         index
     }
 
-    /// Finds the index of the given child_id (0 to 7) of the node at the given bit_level,
-    fn find_split_point(&self, start: usize, end: usize, bit_level: i32, child_id: u8) -> usize {
-        let slice = &self.body_sorted_morton_codes[start..end];
-
-        // partition_point uses binary search to get the index of the first child that does not belong to this child
-        start
-            + slice.partition_point(|&code| {
-                // Right shift the code to make the 3 LSBs correspond to the given bit_level,
-                // and then mask these LSBs to get the child_id bits (3 bits for 2^3 = 8 children).
-                let extracted_child = (code >> (bit_level * 3)) & 0b111;
-                extracted_child <= child_id as u64
-            })
-    }
-
     fn reset(&mut self) {
+        self.body_masses.fill(0.0);
+        self.body_pos_x.fill(0.0);
+        self.body_pos_y.fill(0.0);
+        self.body_pos_z.fill(0.0);
+        self.body_sorted_morton_codes.fill(0);
+        self.morton_to_original_idx.fill(0);
+        self.node_masses.fill(0.0);
+        self.node_com_x.fill(0.0);
+        self.node_com_y.fill(0.0);
+        self.node_com_z.fill(0.0);
+        self.node_widths.fill(0.0);
+        self.flat_node_children.clear();
+        self.flat_node_children_start_idx.fill(usize::MAX);
+        self.node_children_count.fill(0);
+        self.node_bodies_start.fill(usize::MAX);
+        self.node_bodies_count.fill(0);
+
+        self.flat_node_children_levels
+            .fill(Vec::with_capacity(self.max_nodes));
+
         self.node_count = 0;
     }
 
@@ -251,33 +424,53 @@ impl BarnesHutOctree {
         start_idx: usize,
         end_idx: usize,
     ) -> (f64, f64, f64, f64) {
-        compute_com(
-            &self.body_masses[start_idx..end_idx],
-            &self.body_pos_x[start_idx..end_idx],
-            &self.body_pos_y[start_idx..end_idx],
-            &self.body_pos_z[start_idx..end_idx],
-        )
+        let mut total_mass = 0.0;
+        let mut com_x = 0.0;
+        let mut com_y = 0.0;
+        let mut com_z = 0.0;
+
+        for (((&mass, &x), &y), &z) in self.body_masses[start_idx..end_idx]
+            .iter()
+            .zip(&self.body_pos_x[start_idx..end_idx])
+            .zip(&self.body_pos_y[start_idx..end_idx])
+            .zip(&self.body_pos_z[start_idx..end_idx])
+        {
+            total_mass += mass;
+            com_x += mass * x;
+            com_y += mass * y;
+            com_z += mass * z;
+        }
+
+        if total_mass > 0.0 {
+            com_x /= total_mass;
+            com_y /= total_mass;
+            com_z /= total_mass;
+        }
+
+        (total_mass, com_x, com_y, com_z)
     }
 
     fn compute_com_of_node_indices(&self, indices: &[usize]) -> (f64, f64, f64, f64) {
-        // TODO convert node index tracking to SoA to avoid this repeated indexing and vector creation during tree construction
-        let node_masses = indices
-            .iter()
-            .map(|&i| self.node_masses[i])
-            .collect::<Vec<_>>();
-        let node_com_x = indices
-            .iter()
-            .map(|&i| self.node_com_x[i])
-            .collect::<Vec<_>>();
-        let node_com_y = indices
-            .iter()
-            .map(|&i| self.node_com_y[i])
-            .collect::<Vec<_>>();
-        let node_com_z = indices
-            .iter()
-            .map(|&i| self.node_com_z[i])
-            .collect::<Vec<_>>();
-        compute_com(&node_masses, &node_com_x, &node_com_y, &node_com_z)
+        let mut total_mass = 0.0;
+        let mut com_x = 0.0;
+        let mut com_y = 0.0;
+        let mut com_z = 0.0;
+
+        for &i in indices {
+            let mass = self.node_masses[i];
+            total_mass += mass;
+            com_x += mass * self.node_com_x[i];
+            com_y += mass * self.node_com_y[i];
+            com_z += mass * self.node_com_z[i];
+        }
+
+        if total_mass > 0.0 {
+            com_x /= total_mass;
+            com_y /= total_mass;
+            com_z /= total_mass;
+        }
+
+        (total_mass, com_x, com_y, com_z)
     }
 }
 
@@ -325,8 +518,9 @@ fn quantize_f64_to_u64(val: f64, min: f64, width: f64) -> u64 {
     (normalized * (1 << 21) as f64) as u64
 }
 
-/// Sorts SoA bodies by morton code order and returns
-///  - a permutation array with the mapping from sorted to original indices
+/// Sorts SoA bodies by morton code order in-place and returns
+///  - array with the mapping from original to morton sorted indices
+///  - array with the mapping from morton sorted to original indices
 ///  - the sorted morton codes for each body
 fn morton_sort_bodies(
     masses: &mut [f64],
@@ -337,7 +531,7 @@ fn morton_sort_bodies(
     min_y: f64,
     min_z: f64,
     root_width: f64,
-) -> (Vec<usize>, Vec<u64>) {
+) -> (Vec<usize>, Vec<usize>, Vec<u64>) {
     let n = masses.len();
 
     let mut morton_codes_and_idx: Vec<(u64, usize)> = (0..n)
@@ -351,17 +545,31 @@ fn morton_sort_bodies(
 
     morton_codes_and_idx.sort_unstable(); // TODO look into radix sort here
 
-    let mut permutations = Vec::with_capacity(n);
+    let mut morton_to_original_idx = Vec::with_capacity(n);
     let mut sorted_morton_codes = Vec::with_capacity(n);
     for (code, idx) in morton_codes_and_idx.iter() {
         sorted_morton_codes.push(*code);
-        permutations.push(*idx);
+        morton_to_original_idx.push(*idx);
+
+        // Print body and morton code during tests
+        #[cfg(test)]
+        {
+            println!(
+                "Body {}: original_idx={},\n\tmorton_code={:064b}",
+                idx, idx, code,
+            );
+        }
+    }
+
+    let mut original_to_morton_idx = vec![0; n];
+    for (morton_idx, &original_idx) in morton_to_original_idx.iter().enumerate() {
+        original_to_morton_idx[original_idx] = morton_idx;
     }
 
     let mut scratch = Vec::with_capacity(n); // reused to avoid repeated vector creations
     let mut reorder = |data: &mut [f64]| {
         scratch.clear();
-        for &i in &permutations {
+        for &i in &morton_to_original_idx {
             scratch.push(data[i]);
         }
         data.copy_from_slice(&scratch);
@@ -373,7 +581,11 @@ fn morton_sort_bodies(
     reorder(pos_y);
     reorder(pos_z);
 
-    (permutations, sorted_morton_codes)
+    (
+        original_to_morton_idx,
+        morton_to_original_idx,
+        sorted_morton_codes,
+    )
 }
 
 // Loop-based implementation of morton_encode for reference
@@ -408,35 +620,12 @@ fn morton_spread_bits(mut x: u64) -> u64 {
     x
 }
 
-/// Compute total mass and CoM of of a set of masses and positions
-fn compute_com(masses: &[f64], xs: &[f64], ys: &[f64], zs: &[f64]) -> (f64, f64, f64, f64) {
-    let mut total_mass = 0.0;
-    let mut com_x = 0.0;
-    let mut com_y = 0.0;
-    let mut com_z = 0.0;
-
-    for (((&mass, &x), &y), &z) in masses.iter().zip(xs).zip(ys).zip(zs) {
-        total_mass += mass;
-        com_x += mass * x;
-        com_y += mass * y;
-        com_z += mass * z;
-    }
-
-    if total_mass > 0.0 {
-        com_x /= total_mass;
-        com_y /= total_mass;
-        com_z /= total_mass;
-    }
-
-    (total_mass, com_x, com_y, com_z)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_single_body_tree() {
+    fn test_1_body_tree() {
         let masses = vec![2.0];
         let xs = vec![1.0];
         let ys = vec![2.0];
@@ -456,7 +645,7 @@ mod tests {
     }
 
     #[test]
-    fn test_two_body_tree() {
+    fn test_2_body_tree() {
         let masses = vec![1.0, 3.0];
         let xs = vec![0.0, 1.0];
         let ys = vec![1.0, 0.0];
@@ -506,7 +695,7 @@ mod tests {
     }
 
     #[test]
-    fn test_three_body_tree() {
+    fn test_3_body_tree() {
         let masses = vec![1.0, 2.0, 3.0];
         let xs = vec![0.0, 1.0, 2.0];
         let ys = vec![0.0, 0.0, 0.0];

@@ -6,3 +6,4 @@ data/*
 scripts/__pycache__/
 n-body-sim*
 *.old
+.zed/
