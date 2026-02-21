@@ -177,7 +177,7 @@ In non-symplectic integrators, such as the standard Euler or Runge-Kutta methods
 #### **Gravity**
 These algorithms calculate the gravitational forces exerted on each body.
 - **Newtonian**: Calculates the force between every pair of bodies directly. This is perfectly accurate but slow for large systems, with a time complexity of $O(n^2)$.
-- **Barnes-Hut (*planned*)**: An algorithm used for large-scale simulation (e.g. galaxies). It organizes bodies into an octree, treating distant groups of objects as a single combined mass. This introduces a small approximation error but significantly improves performance to $O(n\ log\ n)$.
+- **Barnes-Hut**: An algorithm used for large-scale simulation (e.g. galaxies). It organizes bodies into an octree, treating distant groups of objects as a single combined mass. This introduces a small approximation error but significantly improves performance to $O(n\ log\ n)$.
 
 #### **Softening Factor**
 Gravitational force is calculated using Newton's Law of Universal Gravitation:

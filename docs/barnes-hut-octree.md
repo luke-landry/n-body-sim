@@ -103,7 +103,7 @@ Because of the Morton sorting, a "node" can be treated as a contiguous range of 
 
 This data structure allows us to build the octree recursively in a depth-first manner, where we start with the root node (which corresponds to the entire range of bodies), and then for each node, we check if it contains more than $C$ bodies. If it does, we subdivide it into up to 8 children and then recursively build the octree for each child node. During the recursive construction, each node will compute it's own mass and CoM from the masses and CoMs of its children. For leaf nodes, mass and CoM is computed from the bodies it contains.
 
-Because of the recursive structure, node arrays (storing node information like mass and CoM) will be arranged in this depth-first order:
+Because of the recursive structure, nodes will be constructed in this depth-first order:
 ```
 [root,
 A, AA, AAAL, AABL, AACL, AADL, AB, ABAL, ABBL,
@@ -111,22 +111,7 @@ B, BA, BAAL, BABL, BACL, BB, BBAL, BBBL, BBCL, BBDL,
 C, CA, CAAL, CB, CBAL, CBBL]
 ```
 
-However, to track a node's children indices, we would ideally want to store the node's children contiguously so that we only need store a start index and the number of children it has, instead of storing a vector of indices of child nodes for each node. So, another "flat" array that stores node indices of each child contiguously is needed. This can be populated by pushing the indices of the child nodes of each node onto a stack as they are being created during the recursive build. The flat array would have this "bottom-up" breadth-first structure:
-```
-[
-CAAL, CBAL, CBBL
-BAAL, BABL, BACL, BBAL, BBBL, BBCL, BBDL,
-AAAL, AABL, AACL, AADL, ABAL, ABBL,
-CA, CB,
-BA, BB,
-AA, AB,
-C,
-B,
-A,
-root]
-```
-
-
+To track a node's children indices, we would ideally want to store the node's children contiguously so that we only need store a start index and the number of children it has, instead of storing a vector of indices of child nodes for each node that needs to be indexed every traversal. So, another "flat" array that stores node indices of each child contiguously is needed which should improve cache locality. This can be populated by pushing the indices of the child nodes of each node onto a stack as they are being created during the recursive build. This can be done by pushing the child node indices of each note to a vector of vectors, where the outer vector is indexed by the parent node index and the inner vector contains the child node indices. After the recursive build is complete, this vector of vectors can be flattened into a single array of child node indices while recording the start index and number of children for each node in the node array. This allows us to efficiently access the child nodes of any given node during traversal by simply looking up the start index and number of children for that node.
 
 ### Traversing the Octree
 To compute the gravitational forces on a target body, we can traverse the octree starting from the root node. For each node, we check if the node is sufficiently far away from the target body to be approximated using the criterion $\frac{s}{d}<\theta$. If this condition is satisfied, we use the total mass and CoM of that node to approximate the gravitational force from all the bodies contained within that node. Otherwise, we traverse each of the node's children nodes to compute the forces from those smaller subdivisions of space until the criterion is met or we reach leaf nodes, in which case we directly compute the gravitational force of the target based on the masses and positions of bodies in the leaf nodes.
