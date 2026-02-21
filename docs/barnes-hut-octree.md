@@ -4,40 +4,44 @@
 
 An octree is a tree data structure where each node has 8 children, and can be used to represent regions of 3D space, where each node corresponds to a cubic region. The root node represents the entire cube of space, and each child node represents a subdivision of that space into 8 smaller cubes (octants).
 
-In the context of the Barnes-Hut algorithm, an octree is used to efficiently compute gravitational forces between bodies. Each node in the octree contains information about the mass and center of mass (com) of the bodies contained within that influence of a group of bodies by using the information stored in a node, rather than having to compute the forces from each individual body, which can significantly reduce the computational complexity from $O(N^2)$ to $O(N\ log\ N)$ for $N$ bodies.
+In the the Barnes-Hut algorithm, an octree is used to efficiently compute gravitational forces between bodies. Each internal node in the octree contains information about the total mass and Center of Mass (CoM) of its children, and each leaf node contains information about the masses and positions bodies it contains, as well as their total mass and CoM. When a computing the gravitational forces on a target body, the algorithm traverses the octree, and for each node, it checks if the node is sufficiently far away from the target body to be approximated. How the algorithm determines if a node is far enough to approximate is based on the ratio of the size ($s$) of the node (the width of the cube it represents) to the distance ($d$) being less than a given threshold (denoted as $\theta$), given as $\frac{s}{d}<\theta$. If this condition is satisfied, the algorithm uses the total mass and CoM of that node to approximate the gravitational force from all the bodies contained within that node. Otherwise, the algorithm traverses each of the node's children nodes to compute the forces from those smaller subdivisions of space until the criterion is met or it reaches leaf nodes, in which case it directly computes the gravitational force of the target based on the masses and positions of bodies in the leaf nodes. If $\theta=0$, the criterion will never be satisfied since $s>0$ and $d<\infty$, so for $N$ bodies, the algorithm will simply sum the forces individually which leads to a time complexity of $O(N^2)$. However, as the approximation threshold $\theta$ increases, the time complexity of calculating the forces on a target body approaches $O(N\ log\ N)$, which is much faster for large $N$, but reduces the accuracy of the force calculations as more of the forces are approximated.
 
 The nodes of a Barnes-Hut octree:
 - **root node**: represents the entire space and contains the total mass and center of mass of all bodies.
 - **internal nodes**: represent subdivisions of space and contain the mass and center of mass of the bodies within that subdivision
 - **external (leaf) nodes**: represent individual bodies and contain the mass and position of that body, with no child nodes
+
 ## Implementation
 
 ### Data Structure
 
 The intuitive way to implement an octree would be to use an AoS (Array of Structures) pointer-based structure, where the octree contains a set of node objects, and each node contains pointers to its 8 children. However, this can lead to inefficient memory access patterns and increased memory overhead due to the pointers. Using an SoA (Structure of Arrays) layout, where we store the properties of the nodes and bodies contiguously in separate arrays, can improve cache locality and reduce memory overhead, leading to better performance. It also means we can avoid dynamic memory (heap) allocation during octree construction and instead reuse pre-allocated arrays.
 
-In order to preallocate the arrays for the octree nodes, we need to determine the maximum possible number of nodes that can be created based on the number of bodies (n) and the maximum number of bodies per leaf node (max_leaf_size).
+In order to preallocate the arrays for the octree nodes, we need to determine the maximum possible number of nodes that can be created based on the number of bodies, the maximum number of bodies per leaf node, and the maximum depth of the tree.
 
 Letting
     $N$ = number of bodies
     $L$ = number of leaf nodes
     $C$ = max number of bodies per leaf node
     $I$ = number of internal nodes
+    $D$ = maximum depth of the tree
     $T$ = total number of nodes
 
-Using a sparse tree, can assume assume each leaf node contains at least 1 body ($C \geq 1$)
-    $L \lt N / C$
+Using a sparse tree (empty leaves are not created), we can assume assume each leaf node contains at least 1 body ($C \geq 1$), so:
+    $L \lt \frac{N}{C}$
 
-A node is subdivided into 8 children and becomes an internal node if it contains more than $C$ bodies, so internal nodes must have at least 1 body, which means
+For a perfectly balanced tree, a node would be subdivided into 8 children and becomes an internal node if it contains more than $C$ bodies, so internal nodes must contain at least 1 body, which means:
     $I \lt N$
 
-Combining these inequalities gives us
-    $T = L + I \lt N/C + N \lt 2N$
+However, this calculation assumes the tree is full and perfectly balanced, which would occur if the bodies are uniformly distributed in space, which is usually not the case. For example, in a situation where there are at least two bodies far apart, with one or both of these bodies having another body very close to it, the tree can become highly unbalanced, since the root node needs to cover the large distance between the two, and then this node has to be repeatedly subdivided to distinguish the bodies that are close together. A sun-earth-moon scenario is an example of this: the Earth and Moon are very close together compared to the distance between the Sun and Earth, so the octree's root covers the large distance between the Earth and Sun, but then would need to be subdivided many times so that the Earth and Moon lie in separate octants, leading to a large number of internal nodes. 
 
-Thus, we can reach an upper bound for T
-    $T \leq 2N - 1$
+So, to handle a theoretical worst-case scenario where all leaves ($L$) reach the maximum possible depth of the tree ($D$), which means they each have $D$ parent internal nodes (including the root node), $I$ would be calculated as:
+  $I\lt LD$
 
-So, arrays storing node information can be preallocated with a capacity of $2N - 1$, and arrays storing body information can be preallocated with a capacity of $N$.
+Plugging these inequalities for $L$ and $I$ into the total of $T=L+I$:
+  $T=L+I\lt \frac{N}{C}+LD=\frac{N}{C}+\frac{N}{C}D=\frac{N}{C}(1+D)$
+
+Thus, SoA arrays storing node information can be preallocated with a capacity of $\frac{N}{C}(1+D)$, and SoA arrays storing body information can be preallocated with a capacity of $N$. This allows the arrays to be reused across multiple time steps, and the octree can be rebuilt in-place at each time step by overwriting the node and body information in the arrays, instead of needing to dynamically allocate these arrays at each time step.
 
 To efficiently organize the contiguous arrays of nodes/body information, we can use Morton codes. Morton codes, also known as Z-order curves, are a way to encode multi-dimensional data (like 3D coordinates) into a single dimension while preserving spatial locality. This means that points that are close together in 3D space will also be close together in the 1D Morton code space.
 ### Morton Codes
@@ -97,21 +101,34 @@ Because of the Morton sorting, a "node" can be treated as a contiguous range of 
 |-----------------------------------root----------------------------------------| 
 ```
 
-In this case, the (flat) node array would look like this:
+This data structure allows us to build the octree recursively in a depth-first manner, where we start with the root node (which corresponds to the entire range of bodies), and then for each node, we check if it contains more than $C$ bodies. If it does, we subdivide it into up to 8 children and then recursively build the octree for each child node. During the recursive construction, each node will compute it's own mass and CoM from the masses and CoMs of its children. For leaf nodes, mass and CoM is computed from the bodies it contains.
+
+Because of the recursive structure, node arrays (storing node information like mass and CoM) will be arranged in this depth-first order:
 ```
 [root,
-A,
-AA, AAAL, AABL, AACL, AADL,
-AB, ABAL, ABBL,
-B,
-BA, BAAL, BABL, BACL,
-BB, BBAL, BBBL, BBCL, BBDL,
-C,
-CA, CAAL
-CB, CBAL, CBBL]
+A, AA, AAAL, AABL, AACL, AADL, AB, ABAL, ABBL,
+B, BA, BAAL, BABL, BACL, BB, BBAL, BBBL, BBCL, BBDL,
+C, CA, CAAL, CB, CBAL, CBBL]
 ```
-where each node stores the start index of its children in the node array (e.g. root would store 1 since its first child A is at index 1).
 
-So, to track the nodes, we need to store the node's start index, and which of its children exist. Since the children $0..7$ of a node will be contiguous in the node arrays, we can just store the start index of the first child, and a bitmask indicating which children exist. From that information we can determine which children exist and what their offset from the start index is, and thus we can compute all child node indices.
+However, to track a node's children indices, we would ideally want to store the node's children contiguously so that we only need store a start index and the number of children it has, instead of storing a vector of indices of child nodes for each node. So, another "flat" array that stores node indices of each child contiguously is needed. This can be populated by pushing the indices of the child nodes of each node onto a stack as they are being created during the recursive build. The flat array would have this "bottom-up" breadth-first structure:
+```
+[
+CAAL, CBAL, CBBL
+BAAL, BABL, BACL, BBAL, BBBL, BBCL, BBDL,
+AAAL, AABL, AACL, AADL, ABAL, ABBL,
+CA, CB,
+BA, BB,
+AA, AB,
+C,
+B,
+A,
+root]
+```
 
-This data structure allows us to build the octree recursively in a depth-first manner, where we start with the root node (which corresponds to the entire range of bodies), and then for each node, we check if it contains more than $C$ bodies. If it does, we subdivide it into up to 8 children and then recursively build the octree for each child node. During the recursive construction, each node will compute it's own mass and CoM from the masses and CoMs of its children. For leaf nodes, the mass and CoM is computed from the bodies it contains.
+
+
+### Traversing the Octree
+To compute the gravitational forces on a target body, we can traverse the octree starting from the root node. For each node, we check if the node is sufficiently far away from the target body to be approximated using the criterion $\frac{s}{d}<\theta$. If this condition is satisfied, we use the total mass and CoM of that node to approximate the gravitational force from all the bodies contained within that node. Otherwise, we traverse each of the node's children nodes to compute the forces from those smaller subdivisions of space until the criterion is met or we reach leaf nodes, in which case we directly compute the gravitational force of the target based on the masses and positions of bodies in the leaf nodes.
+
+This traversal can be implemented iteratively using a stack to avoid the performance overhead of recursion, which is more impactful for traversal (which is run N-times per step) compared to the recursive octree build which is only once per step. We push the root node onto the stack, and then in a loop, we pop a node from the stack, check the approximation criterion, and either compute the force or push its children onto the stack. This allows us to efficiently compute the forces on the target body while minimizing the number of nodes we need to visit.
