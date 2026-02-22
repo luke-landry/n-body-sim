@@ -1,0 +1,36 @@
+{
+    "simulation_parameters": {
+        "g_constant": 1.0,
+        "time_step": 0.01,
+        "num_steps": 10000,
+        "softening_factor": 0.05,
+        "theta": 0.5,
+        "gravity": "newton",
+        "integrator": "runge-kutta",
+        "progress": false
+    },
+    "visualizer_config": {
+        "window_title": "N-body 3D Visualizer",
+        "window_width": 1000,
+        "window_height": 700,
+        "step_rate": 100,
+        "enable_trails": true,
+        "trail_window": 150,
+        "camera_mode": "fly",
+        "spherical": true,
+        "default_radius": 0.1,
+        "enable_legend": true,
+        "names": [
+            "Body 1",
+            "Body 2"
+        ],
+        "radii": [
+            0.05,
+            0.05
+        ],
+        "colors": [
+            "red",
+            "blue"
+        ]
+    }
+}

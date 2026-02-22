@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QPushButton,
     QSpinBox,
+    QStyledItemDelegate,
     QTableView,
     QVBoxLayout,
     QWidget,
@@ -176,6 +177,14 @@ class Launcher(QWidget):
         self.body_table_view.horizontalHeader().setSectionResizeMode(
             QHeaderView.Stretch  # type: ignore
         )  # type: ignore
+
+        # using a delegate to allow entering float values up to 10 decimal
+        # places for position and velocity columns
+        float_delegate = FloatSpinBoxDelegate(decimals=10)
+        for col, key in enumerate(self.body_table_model.keys):
+            if key.startswith("pos_") or key.startswith("vel_"):
+                self.body_table_view.setItemDelegateForColumn(col, float_delegate)
+
         self.main_layout.addWidget(self.body_table_view)
 
     def initialize_ui_controls(self):
@@ -398,3 +407,25 @@ class Launcher(QWidget):
             self, caption, "", "CSV Files (*.csv)"
         )
         return Path(path_str) if path_str else None
+
+
+# delegate for editing float values in the body table to allow custom formatting and decimal precision
+class FloatSpinBoxDelegate(QStyledItemDelegate):
+    def __init__(self, decimals=10, minimum=-1e10, maximum=1e10, parent=None):
+        super().__init__(parent)
+        self.decimals = decimals
+        self.minimum = minimum
+        self.maximum = maximum
+
+    def createEditor(self, parent, option, index):
+        editor = QDoubleSpinBox(parent)
+        editor.setDecimals(self.decimals)
+        editor.setRange(self.minimum, self.maximum)
+        return editor
+
+    def setEditorData(self, editor, index):
+        value = float(index.model().data(index, 0))
+        editor.setValue(value)
+
+    def setModelData(self, editor, model, index):
+        model.setData(index, editor.value())

@@ -1,7 +1,7 @@
+pub mod octree;
+
 use crate::gravity::{Gravity, barnes_hut::octree::BarnesHutOctree};
 use rayon::prelude::*;
-
-pub mod octree;
 
 pub struct BarnesHutGravity {
     g_constant: f64,

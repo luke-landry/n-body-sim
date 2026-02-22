@@ -1,0 +1,4 @@
+3-body system where the bodies move in a figure-eight pattern.
+
+The initial condition values were found from this video:
+https://www.youtube.com/watch?v=iuRtNK2-jO8
