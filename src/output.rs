@@ -65,19 +65,6 @@ pub fn flatten_bodies_snapshots(snapshots: &[BodiesSnapshot]) -> Vec<BodySnapsho
     flat
 }
 
-pub fn print_data(data: Vec<BodySnapshot>) {
-    println!("{}", "=".repeat(80));
-    println!("{:^80}", "N-Body Simulation Results");
-    println!("{}", "=".repeat(80));
-
-    for snapshot in &data {
-        println!("{}", snapshot);
-    }
-
-    println!("{}", "=".repeat(80));
-    println!("Total snapshots: {}", data.len());
-}
-
 pub fn save_to_csv(path: &Path, data: Vec<BodySnapshot>) -> Result<(), std::io::Error> {
     let mut wtr = Writer::from_path(path)?;
 

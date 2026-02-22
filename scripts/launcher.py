@@ -1,4 +1,3 @@
-import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -196,10 +195,10 @@ class Launcher(QWidget):
         self.remove_btn = QPushButton("Delete Selected Body")
         self.remove_btn.clicked.connect(self.remove_selected_body)
         button_layout.addWidget(self.remove_btn)
-        self.load_btn = QPushButton("Load Configuration")
+        self.load_btn = QPushButton("Load Scenario")
         self.load_btn.clicked.connect(self.handle_load)
         button_layout.addWidget(self.load_btn)
-        self.save_btn = QPushButton("Save Configuration")
+        self.save_btn = QPushButton("Save Scenario")
         self.save_btn.clicked.connect(self.handle_save)
         button_layout.addWidget(self.save_btn)
         self.main_layout.addLayout(button_layout)
@@ -232,12 +231,12 @@ class Launcher(QWidget):
         self.main_layout.addWidget(self.launch_sim_btn)
 
         launch_suboptions_layout = QHBoxLayout()
-        self.launch_sim_only_btn = QPushButton("Run Simulation Only")
+        self.launch_sim_only_btn = QPushButton("Launch Simulation")
         self.launch_sim_only_btn.setMinimumHeight(40)
         self.launch_sim_only_btn.clicked.connect(self.launch_run_sim_only)
         self.main_layout.addWidget(self.launch_sim_only_btn)
         launch_suboptions_layout.addWidget(self.launch_sim_only_btn)
-        self.launch_vis_btn = QPushButton("Load Visualization")
+        self.launch_vis_btn = QPushButton("View Simulation")
         self.launch_vis_btn.setMinimumHeight(40)
         self.launch_vis_btn.clicked.connect(self.launch_view_sim)
         self.main_layout.addWidget(self.launch_vis_btn)

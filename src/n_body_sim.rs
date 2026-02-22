@@ -34,14 +34,7 @@ impl NBodySim {
     pub fn run(self) -> Result<(), Box<dyn Error>> {
         let mut simulator = self.simulator;
         let data = simulator.run();
-        match self.args.output_data_path {
-            Some(path) => {
-                output::save_to_csv(&path, data)?;
-            }
-            None => {
-                output::print_data(data);
-            }
-        }
+        output::save_to_csv(&self.args.output_data_path, data)?;
 
         Ok(())
     }

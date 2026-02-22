@@ -10,34 +10,60 @@ This project implements an N-body simulator that models the gravitational intera
 ### Prerequisites
 - Python installed
 
-### Windows
+### Windows Setup
 1. Download and extract the latest Windows release zip
-2. Run `install.bat` to setup the  virtual environment and install required packages (first time only)
+2. Run `install.bat` to setup the Python virtual environment and install required packages (first time only)
 3. Run `run.bat` to start the application
 
-### Linux
+### Linux Setup
 1. Download and extract the latest Linux release tarball
-2. Run `install.sh` to setup the virtual environment and install required packages (first time only)
-    - On Debian/Ubuntu, you may need to install `python3-venv` with `sudo apt install python3-venv` before running the install script
+2. Run `install.sh` to setup the Python virtual environment and install required packages (first time only)
+    - On Debian/Ubuntu, you may need to install `python3-venv` with `sudo apt install python3-venv` before running this install script
 3. Run `run.sh` to start the application
+
+### Run an Example Simulation
+1. Start the application using the instructions above
+2. Click "Load Scenario" and select an example initial conditions file (e.g. `data/examples/figure-eight/initial_conditions.csv`)
+3. Click "Launch and View Simulation" to run the simulation and see the results.
+4. In the visualizer window, press the "Play" button in the bottom left to start the simulation playback.
+5. Use the WASD, QE, and FC keys to move and left-click mouse-drag to look around
+6. You can close the visualizer window at any time and go back to the launcher to load a different configuration or run a new simulation. The launcher stays open while the visualizer is running, so you can launch multiple simulations and have multiple visualizer windows open at the same time.
+
+See the [GUI Usage](#gui-usage) and [CLI Usage](#cli-usage) sections below for more details on how to use the application.
 
 ## GUI Usage
 
 ### Launcher
 The launcher allows you to configure simulation parameters and body initial conditions:
-- **Parameter Configuration**: Set the various simulation parameters
-- **Visualization Configuration**: Configure graphics settings
+- **Simulation Parameters**: Set the various simulation parameters:
+  - Gravitational constant 
+  - Time step
+  - Number of steps
+  - Softening factor
+  - Theta (for Barnes-Hut)
+  - Gravity calculation method (if $N$ is the number of bodies in the simulation, it is recommended to use `newton` for $N\lt 100$, `newton-parallel` for $100 \leq N\lt 500$, and `barnes_hut` for $N\geq 500$.)
+  - Integration method (the `runge-kutta` integrator takes the longest to compute, `velocity-verlet` is approximately twice as fast as `runge-kutta`, and `euler` is approximately twice as fast as `velocity-verlet`, so 4x faster than `runge-kutta`, but is the least accurate of the three)
+- **Visualization Configuration**: Configure visualization and graphics settings
+  - Camera mode (fly or turntable)
+  - Step rate (playback speed in steps/second)
+  - Default radius of bodies in visualization
+  - Trail window size (length in previous time steps of trails behind each body)
+  - Enable trails showing the recent path of each body ***(recommend disabling when viewing simulations with 100+ bodies to avoid lag during playback)***
+  - Enable legend
+  - Enable spherical visual effect for bodies (when disabled, bodies are rendered as flat colored circles)
 - **Body Table**: Add, remove, and edit body properties (name, color, radius, mass, position, velocity)
-- **Load/Save**: Load existing configurations or save your current setup
-- **Generate Random Scenario**: Generate a random N-body system
-- **Launch Simulation**: Start the physics simulation with your configured parameters and automatically display the visualization when complete
-- **Simulate Only**: Run the physics simulation without displaying the visualization. Prompts you to select a directory to save the results
+- **Load/Save Scenario**: Load existing launcher configurations or save your current one
+- **Generate Scenario**: Generate a random N-body system based on the selected generator (e.g. Star System), number of bodies (n) and radius (r).
+- **Launch and View Simulation**: Start the physics simulation with your configured parameters and automatically display the visualization when complete
+- **Launch Simulation**: Run the physics simulation without displaying the visualization. Prompts you to select a directory to save the results
 - **View Simulation**: Load and display the visualization of previously saved simulation results from a selected directory
 
-**Note:** The launcher expects these specific file names in selected directories when loading/saving configurations and simulation data:
+**Note:** The launcher expects these specific file names in selected directories when loading or saving configurations and simulation data:
 - `initial_conditions.csv` for body initial conditions
 - `config.json` for launcher configuration
 - `output.csv` or `output.nbody` for simulation output data
+
+When using the "Launch and View Simulation" option, the launcher automatically saves the initial conditions (`initial_conditions.csv`), the configuration (`config.json`), and the output data (`output.csv` or `output.nbody`) files to the directory `data/run/run_<timestamp>`. Otherwise, when using the individual "Launch Simulation" or "View Simulation" options, you will be prompted to select a directory to save or load these files, respectively.
 
 ### Visualizer
 
@@ -62,27 +88,29 @@ The visualizer supports two camera modes:
 The Rust physics engine can also be run independently without installing Python or using the GUI tools.
 
 ### Command Line Options
-- `-i, --initial-conditions-path <INITIAL_CONDITIONS_PATH>`: Path to initial conditions file
-- `-o, --output-data-path <OUTPUT_DATA_PATH>`: Path to output trajectory data file
-- `-g, --g-constant <G_CONSTANT>`: The gravitational constant to use in gravitational force calculations
-- `-t, --time-step <TIME_STEP>`: Simulation time step in seconds
-- `-n, --num-steps <NUM_STEPS>`: Number of time steps to simulate
-- `--softening-factor <SOFTENING_FACTOR>`: The softening factor to avoid numerical instability as distances approach zero
-- `--theta <THETA>`: Theta value for Barnes-Hut gravity calculation method
-- `--gravity <GRAVITY>`: Gravity calculation method: `newton`, `newton-parallel` (more to be added)
-- `--integrator <INTEGRATOR>`: Integration method: `euler` (more to be added)
-- `-h, --help`: Print help
+
+**General Usage**
+- `-i, --initial-conditions-path`: Path to a CSV file containing the initial conditions for each body in the simulation. Each row should represent a body with its mass, initial position, and initial velocity. Default: `initial_conditions.csv`
+- `-o, --output-data-path`: Path to a CSV file where the simulation output data will be saved. Default: `output.csv`
+- `-g, --g-constant`: The gravitational constant to use in the gravitational force calculations. This is a scaling factor that affects the strength of the gravitational interactions between bodies. Default: `1.0`
+- `-t, --time-step`: The time step in seconds for the simulation. This determines how frequently the positions and velocities of the bodies are updated. A smaller time step can lead to more accurate results but will increase the computation time. Default: `0.01`
+- `-n, --num-steps`: The total number of time steps to simulate. This determines the overall duration of the simulation. For example, with a time step of 0.01 seconds and 10000 steps, the simulation will cover a total of 100 seconds of simulated time. Default: `10000`
+- `--softening-factor`: The softening factor is used to prevent numerical instability when two bodies come very close to each other. It is added to the distance between bodies in the force calculation to ensure that the force does not become infinite. A larger softening factor increases numerical stability but reduces physical accuracy at short distances, while a smaller softening factor provides higher physical accuracy but increases the risk of instability during close encounters. Default: `0.005`
+- `--theta`: The theta value is used in the Barnes-Hut gravity calculation method to determine when to approximate a group of distant bodies as a single combined mass. A smaller theta value results in a more accurate simulation but increases computation time, while a larger theta value reduces accuracy but improves performance. Default: `0.5`
+- `--gravity`: The method to use for calculating gravitational forces between bodies. The options are `newton`, `newton-parallel`, and `barnes-hut`. Default: `newton`
+- `--integrator`: The numerical integration method to use for updating the positions and velocities of the bodies at each time step. The options are `euler`, `velocity-verlet`, and `runge-kutta`. Default: `euler`
+- `-h --help`: Displays the help message with all available command line options, including those not listed here (e.g., benchmark options).
 
 ### Examples
 
 **Windows:**
 ```
-.\n-body-sim.exe -i data/examples/figure-eight.csv -o data/output.csv --time-step 0.01 --num-steps 10000 --integrator euler
+.\n-body-sim.exe -i data/examples/figure-eight.csv -o data/output.csv --time-step 0.01 --num-steps 10000 --integrator velocity-verlet
 ```
 
 **Linux:**
 ```
-./n-body-sim -i data/examples/figure-eight.csv -o data/output.csv --time-step 0.01 --num-steps 10000 --integrator euler
+./n-body-sim -i data/examples/figure-eight.csv -o data/output.csv --time-step 0.01 --num-steps 10000 --integrator velocity-verlet
 ```
 
 ## Data Formats
@@ -177,7 +205,7 @@ In non-symplectic integrators, such as the standard Euler or Runge-Kutta methods
 #### **Gravity**
 These algorithms calculate the gravitational forces exerted on each body.
 - **Newtonian**: Calculates the force between every pair of bodies directly. This is perfectly accurate but slow for large systems, with a time complexity of $O(n^2)$.
-- **Barnes-Hut**: An algorithm used for large-scale simulation (e.g. galaxies). It organizes bodies into an octree, treating distant groups of objects as a single combined mass. This introduces a small approximation error but significantly improves performance to $O(n\ log\ n)$.
+- **Barnes-Hut**: An algorithm used for large-scale simulation (e.g. galaxies). It organizes bodies into an octree, treating distant groups of objects as a single combined mass based on a given approximation threshold $\theta$ (theta). This introduces a small approximation error but significantly improves performance to $O(n\ log\ n)$.
 
 #### **Softening Factor**
 Gravitational force is calculated using Newton's Law of Universal Gravitation:

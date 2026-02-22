@@ -4,7 +4,7 @@
 
 pub const DEFAULT_INITIAL_CONDITIONS_PATH: &str = "initial_conditions.csv";
 
-pub const DEFAULT_OUTPUT_PATH: &str = "output.txt";
+pub const DEFAULT_OUTPUT_PATH: &str = "output.csv";
 
 pub const DEFAULT_G: f64 = 1.0;
 
