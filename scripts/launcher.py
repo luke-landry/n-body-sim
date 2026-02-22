@@ -210,7 +210,7 @@ class Launcher(QWidget):
         generator_layout.addWidget(self.generator_combo)
         self.generator_n_input = QSpinBox()
         self.generator_n_input.setPrefix("n: ")
-        self.generator_n_input.setRange(2, 1000)
+        self.generator_n_input.setRange(2, 1000000)
         self.generator_n_input.setValue(10)
         generator_layout.addWidget(self.generator_n_input)
         self.generator_r_input = QDoubleSpinBox()

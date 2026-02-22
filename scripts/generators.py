@@ -4,6 +4,10 @@ import numpy as np
 from schema import BodyConfig
 
 
+def calculate_orbital_velocity(G: float, M: float, r: float) -> float:
+    return np.sqrt(G * M / r)
+
+
 def generate_single_star_system(
     n: int,
     radius: float = 15.0,
@@ -52,8 +56,7 @@ def generate_single_star_system(
         theta = rd.uniform(0.0, 2.0 * np.pi)
         base_pos = np.array([r * np.cos(theta), r * np.sin(theta), 0.0])
 
-        # equation for orbital velocity is v = sqrt(GM/r)
-        v = np.sqrt(G * star_mass / r)
+        v = calculate_orbital_velocity(G, star_mass, r)
         base_vel = np.array([-v * np.sin(theta), v * np.cos(theta), 0.0])
 
         cos_inc = np.cos(inc)
@@ -95,4 +98,62 @@ def generate_single_star_system(
     return bodies
 
 
-generators = {"Star System": generate_single_star_system}
+def generate_disc_galaxy(
+    n: int,
+    radius: float = 20.0,
+    body_mass: float = 1e-3,
+    body_radius: float = 0.05,
+    G: float = 1.0,
+    density_power: float = 1.5,
+    softening: float = 0.5,
+) -> list[BodyConfig]:
+    bodies: list[BodyConfig] = []
+
+    # Generate positions
+    radii = []
+    positions = []
+    for _ in range(n):
+        r = radius * (rd.random() ** density_power)
+        theta = rd.uniform(0, 2 * np.pi)
+        z = rd.gauss(0, radius * 0.01)  # very thin initial disc
+        radii.append(r)
+        positions.append((r, theta, z))
+
+    sorted_indices = np.argsort(radii)
+
+    for rank, idx in enumerate(sorted_indices):
+        r, theta, z = positions[idx]
+        m_enclosed = (rank + 1) * body_mass
+        v_mag = np.sqrt(G * m_enclosed * r / (r**2 + softening**2))
+
+        # Add random velocity dispersion to prevent clumping
+        dispersion = v_mag * 0.1
+        vx = (-v_mag * np.sin(theta)) + rd.gauss(0, dispersion)
+        vy = (v_mag * np.cos(theta)) + rd.gauss(0, dispersion)
+        vz = rd.gauss(0, dispersion * 0.5)  # small vertical jitter
+
+        x = r * np.cos(theta)
+        y = r * np.sin(theta)
+
+        bodies.append(
+            BodyConfig(
+                name=f"Star {idx}",
+                color="#ffffff",
+                radius=body_radius,
+                mass=body_mass,
+                pos_x=x,
+                pos_y=y,
+                pos_z=z,
+                vel_x=vx,
+                vel_y=vy,
+                vel_z=vz,
+            )
+        )
+
+    return bodies
+
+
+generators = {
+    "Star System": generate_single_star_system,
+    "Disc Galaxy": generate_disc_galaxy,
+}
