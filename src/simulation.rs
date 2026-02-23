@@ -1,21 +1,55 @@
 use crate::integrators::Integrator;
-use crate::output::{BodiesSnapshot, BodySnapshot, flatten_bodies_snapshots};
-use glam::DVec3;
+use crate::output::SimulationData;
+use std::sync::mpsc::Sender;
 
 #[derive(Clone)]
 pub struct Body {
     pub mass: f64,
-    pub position: DVec3,
-    pub velocity: DVec3,
+    pub pos_x: f64,
+    pub pos_y: f64,
+    pub pos_z: f64,
+    pub vel_x: f64,
+    pub vel_y: f64,
+    pub vel_z: f64,
 }
 
 impl Body {
-    pub fn new(mass: f64, position: DVec3, velocity: DVec3) -> Self {
-        Self {
+    pub fn new(
+        mass: f64,
+        pos_x: f64,
+        pos_y: f64,
+        pos_z: f64,
+        vel_x: f64,
+        vel_y: f64,
+        vel_z: f64,
+    ) -> Self {
+        Body {
             mass,
-            position,
-            velocity,
+            pos_x,
+            pos_y,
+            pos_z,
+            vel_x,
+            vel_y,
+            vel_z,
         }
+    }
+}
+
+impl From<Bodies> for Vec<Body> {
+    fn from(bodies: Bodies) -> Self {
+        let mut result = Vec::with_capacity(bodies.len());
+        for i in 0..bodies.len() {
+            result.push(Body {
+                mass: bodies.masses[i],
+                pos_x: bodies.pos_x[i],
+                pos_y: bodies.pos_y[i],
+                pos_z: bodies.pos_z[i],
+                vel_x: bodies.vel_x[i],
+                vel_y: bodies.vel_y[i],
+                vel_z: bodies.vel_z[i],
+            });
+        }
+        result
     }
 }
 
@@ -83,12 +117,12 @@ impl From<&[Body]> for Bodies {
 
         for body in bodies {
             masses.push(body.mass);
-            pos_x.push(body.position.x);
-            pos_y.push(body.position.y);
-            pos_z.push(body.position.z);
-            vel_x.push(body.velocity.x);
-            vel_y.push(body.velocity.y);
-            vel_z.push(body.velocity.z);
+            pos_x.push(body.pos_x);
+            pos_y.push(body.pos_y);
+            pos_z.push(body.pos_z);
+            vel_x.push(body.vel_x);
+            vel_y.push(body.vel_y);
+            vel_z.push(body.vel_z);
         }
 
         Bodies {
@@ -100,20 +134,6 @@ impl From<&[Body]> for Bodies {
             vel_y,
             vel_z,
         }
-    }
-}
-
-impl Into<Vec<Body>> for Bodies {
-    fn into(self) -> Vec<Body> {
-        let mut bodies = Vec::with_capacity(self.masses.len());
-        for i in 0..self.masses.len() {
-            bodies.push(Body {
-                mass: self.masses[i],
-                position: DVec3::new(self.pos_x[i], self.pos_y[i], self.pos_z[i]),
-                velocity: DVec3::new(self.vel_x[i], self.vel_y[i], self.vel_z[i]),
-            });
-        }
-        bodies
     }
 }
 
@@ -162,33 +182,55 @@ pub struct Simulator {
     bodies: Vec<Body>,
     parameters: Parameters,
     integrator: Box<dyn Integrator>,
+    tx: Option<Sender<SimulationData>>,
 }
 
 impl Simulator {
-    pub fn new(bodies: Vec<Body>, parameters: Parameters, integrator: Box<dyn Integrator>) -> Self {
+    // Max size of a batch of simulation data to send in bytes
+    const BATCH_SIZE_BYTES: usize = 16000000;
+
+    // Number of simulation data records that fit in a batch of BATCH_SIZE_BYTES bytes
+    const BATCH_SIZE: usize = Self::BATCH_SIZE_BYTES / SimulationData::RECORD_SIZE_BYTES;
+
+    pub fn new(
+        bodies: Vec<Body>,
+        parameters: Parameters,
+        integrator: Box<dyn Integrator>,
+        tx: Option<Sender<SimulationData>>,
+    ) -> Self {
         Simulator {
             bodies,
             parameters,
             integrator,
+            tx,
         }
     }
 
-    pub fn run(&mut self) -> Vec<BodySnapshot> {
-        // Precompute total results size to avoid memory reallocations
-        let num_results = self.bodies.len() * (self.parameters.num_steps + 1);
+    pub fn run(&mut self) {
+        let mut bodies = Bodies::from(self.bodies.as_slice());
+        let mut buffer = SimulationData::with_capacity(Self::BATCH_SIZE);
         let one_percent_steps = (self.parameters.num_steps / 100).max(1);
-
-        // Data is a AoSoA where we record a set of body snapshots at each time step,
-        // which will be converted to a flat Vec<BodySnapshot> for output. This avoids
-        // performing conversions from SoA to AoS at each step during the simulation.
-        let mut data_soa: Vec<BodiesSnapshot> = Vec::with_capacity(num_results);
-
-        let mut bodies_soa = Bodies::from(self.bodies.as_slice());
-
         let mut time = 0.0;
+
+        // main simulation loop
         for step in 0..self.parameters.num_steps {
-            data_soa.push(BodiesSnapshot::from_state(&bodies_soa, time));
-            self.integrator.step(&mut bodies_soa);
+            if let Some(tx) = &self.tx {
+                // record current time step simulation data in the buffer
+                buffer.extend_from_step(time, &bodies.pos_x, &bodies.pos_y, &bodies.pos_z);
+
+                if buffer.len() >= Self::BATCH_SIZE {
+                    // avoid cloning the buffer by replacing it with an
+                    // empty one and sending the full batch to the output channel
+                    let batch = std::mem::replace(
+                        &mut buffer,
+                        SimulationData::with_capacity(Self::BATCH_SIZE),
+                    );
+                    tx.send(batch)
+                        .expect("Failed to send simulation data batch");
+                }
+            }
+
+            self.integrator.step(&mut bodies);
             time += self.parameters.time_step;
 
             if self.parameters.progress && step % one_percent_steps == 0 {
@@ -196,9 +238,10 @@ impl Simulator {
             }
         }
 
-        // Capture final state
-        data_soa.push(BodiesSnapshot::from_state(&bodies_soa, time));
-
-        flatten_bodies_snapshots(&data_soa)
+        // record final state and send remaining data
+        buffer.extend_from_step(time, &bodies.pos_x, &bodies.pos_y, &bodies.pos_z);
+        if let Some(tx) = &self.tx {
+            tx.send(buffer).unwrap();
+        }
     }
 }

@@ -47,7 +47,7 @@ pub fn compute_acceleration(
     );
 }
 
-pub trait Integrator {
+pub trait Integrator: Send {
     /// Advances the simulation by one time step
     fn step(&mut self, bodies: &mut Bodies);
 }

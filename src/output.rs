@@ -1,78 +1,103 @@
-use std::{fmt, path::Path};
-
-use crate::simulation::Bodies;
-use csv::Writer;
+use csv;
 use serde::Serialize;
+use std::path::PathBuf;
+
+pub struct SimulationData {
+    times: Vec<f64>,
+    ids: Vec<u64>,
+    pos_x: Vec<f64>,
+    pos_y: Vec<f64>,
+    pos_z: Vec<f64>,
+}
+
+impl SimulationData {
+    // The size of a single simulation data record is 5 64-bit (8-byte)
+    // values: time, id, pos_x, pos_y, pos_z, so 5x8 = 40 bytes per record.
+    pub const RECORD_SIZE_BYTES: usize = 40;
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        SimulationData {
+            times: Vec::with_capacity(capacity),
+            ids: Vec::with_capacity(capacity),
+            pos_x: Vec::with_capacity(capacity),
+            pos_y: Vec::with_capacity(capacity),
+            pos_z: Vec::with_capacity(capacity),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.times.len()
+    }
+
+    pub fn extend_from_step(&mut self, time: f64, pos_x: &[f64], pos_y: &[f64], pos_z: &[f64]) {
+        self.times.extend(std::iter::repeat(time).take(pos_x.len()));
+        self.ids.extend(0..pos_x.len() as u64);
+        self.pos_x.extend_from_slice(pos_x);
+        self.pos_y.extend_from_slice(pos_y);
+        self.pos_z.extend_from_slice(pos_z);
+    }
+}
 
 #[derive(Serialize)]
-pub struct BodySnapshot {
+struct SimulationDataRecord {
     time: f64,
-    id: usize,
+    id: u64,
     x: f64,
     y: f64,
     z: f64,
 }
 
-impl fmt::Display for BodySnapshot {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Time: {:>10.4}s | Body {:>3} | Position: ({:>12.6}, {:>12.6})",
-            self.time, self.id, self.x, self.y
-        )
+pub struct SimulationDataWriter {
+    path: PathBuf,
+    rx: std::sync::mpsc::Receiver<SimulationData>,
+}
+
+impl SimulationDataWriter {
+    pub fn new(path: PathBuf, rx: std::sync::mpsc::Receiver<SimulationData>) -> Self {
+        SimulationDataWriter { path, rx }
     }
-}
 
-/// SoA representation of BodySnapshot
-pub struct BodiesSnapshot {
-    pub time: f64,
-    pub ids: Vec<usize>,
-    pub pos_x: Vec<f64>,
-    pub pos_y: Vec<f64>,
-    pub pos_z: Vec<f64>,
-}
+    pub fn run(&self) -> Result<(), std::io::Error> {
+        let extension = self
+            .path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|s| s.to_ascii_lowercase());
 
-impl BodiesSnapshot {
-    pub fn from_state(bodies: &Bodies, time: f64) -> Self {
-        BodiesSnapshot {
-            time,
-            ids: (0..bodies.len()).collect(),
-            pos_x: bodies.pos_x.clone(),
-            pos_y: bodies.pos_y.clone(),
-            pos_z: bodies.pos_z.clone(),
+        let format = match extension {
+            Some(ext) => ext,
+            None => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "File must have a valid extension",
+                ));
+            }
+        };
+
+        match format.as_str() {
+            "csv" => self.write_csv(),
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Unsupported file format",
+            )),
         }
     }
 
-    pub fn len(&self) -> usize {
-        self.ids.len()
-    }
-}
-
-pub fn flatten_bodies_snapshots(snapshots: &[BodiesSnapshot]) -> Vec<BodySnapshot> {
-    let mut flat = Vec::new();
-    for snapshot in snapshots {
-        let n = snapshot.len();
-        for i in 0..n {
-            flat.push(BodySnapshot {
-                time: snapshot.time,
-                id: snapshot.ids[i],
-                x: snapshot.pos_x[i],
-                y: snapshot.pos_y[i],
-                z: snapshot.pos_z[i],
-            });
+    fn write_csv(&self) -> Result<(), std::io::Error> {
+        let mut wtr = csv::Writer::from_path(&self.path)?;
+        for batch in self.rx.iter() {
+            for i in 0..batch.len() {
+                let record = SimulationDataRecord {
+                    time: batch.times[i],
+                    id: batch.ids[i],
+                    x: batch.pos_x[i],
+                    y: batch.pos_y[i],
+                    z: batch.pos_z[i],
+                };
+                wtr.serialize(record)?;
+            }
         }
+        wtr.flush()?;
+        Ok(())
     }
-    flat
-}
-
-pub fn save_to_csv(path: &Path, data: Vec<BodySnapshot>) -> Result<(), std::io::Error> {
-    let mut wtr = Writer::from_path(path)?;
-
-    for snapshot in &data {
-        wtr.serialize(snapshot)?;
-    }
-
-    wtr.flush()?;
-
-    Ok(())
 }

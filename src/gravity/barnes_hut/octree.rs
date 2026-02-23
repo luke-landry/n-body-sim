@@ -36,7 +36,7 @@ pub struct BarnesHutOctree {
     node_widths: Vec<f64>,
 
     // per-node indices of children during tree construction, will be flattened into flat_node_children after construction
-    node_children: Vec<Vec<usize>>,
+    node_children: Vec<Vec<usize>>, // TODO replace with vec[max_nodes  * 8] for fully contiguous memory layout
     node_children_count: Vec<usize>,
 
     /// Points to the start and length of the block in the sorted body arrays.

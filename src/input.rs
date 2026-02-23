@@ -1,7 +1,6 @@
 use crate::simulation::Body;
 
 use csv::Reader;
-use glam::DVec3;
 use serde::Deserialize;
 use std::error::Error;
 use std::path::Path;
@@ -25,9 +24,7 @@ pub fn load_bodies(path: &Path) -> Result<Vec<Body>, Box<dyn Error>> {
         .map(|result| {
             result.map(|ic| {
                 Body::new(
-                    ic.mass,
-                    DVec3::new(ic.pos_x, ic.pos_y, ic.pos_z),
-                    DVec3::new(ic.vel_x, ic.vel_y, ic.vel_z),
+                    ic.mass, ic.pos_x, ic.pos_y, ic.pos_z, ic.vel_x, ic.vel_y, ic.vel_z,
                 )
             })
         })

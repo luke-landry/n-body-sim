@@ -2,7 +2,7 @@ pub mod barnes_hut;
 pub mod newton;
 pub mod newton_parallel;
 
-pub trait Gravity {
+pub trait Gravity: Send {
     /// Writes accelerations into the output parameter instead of returning a value to avoid
     /// heap allocation on every step by allowing buffer reuse in the main simulation loop.
     /// The accelerations buffer must be zeroed before each call to this function.

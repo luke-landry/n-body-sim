@@ -1,12 +1,12 @@
 use crate::cli::Args;
 use crate::input;
-use crate::output;
+use crate::output::SimulationDataWriter;
 use crate::simulation::{Parameters, Simulator};
 use std::error::Error;
 
 pub struct NBodySim {
-    args: Args,
     simulator: Simulator,
+    writer: SimulationDataWriter,
 }
 
 impl NBodySim {
@@ -26,16 +26,29 @@ impl NBodySim {
             .integrator
             .create(gravity, parameters.time_step, bodies.len());
 
-        let simulator = Simulator::new(bodies, parameters, integrator);
+        let (tx, rx) = std::sync::mpsc::channel();
+        let simulator = Simulator::new(bodies, parameters, integrator, Some(tx));
+        let writer = SimulationDataWriter::new(args.output_data_path.clone(), rx);
 
-        Ok(Self { args, simulator })
+        Ok(Self { simulator, writer })
     }
 
     pub fn run(self) -> Result<(), Box<dyn Error>> {
+        let writer = self.writer;
         let mut simulator = self.simulator;
-        let data = simulator.run();
-        output::save_to_csv(&self.args.output_data_path, data)?;
 
-        Ok(())
+        // run writer and simulator in separate threads
+        let writer_handle = std::thread::spawn(move || writer.run());
+        let simulator_handle = std::thread::spawn(move || simulator.run());
+
+        simulator_handle
+            .join()
+            .map_err(|_| "Simulator thread panicked")?;
+
+        // wait for writer to finish after simulation completes
+        writer_handle
+            .join()
+            .map_err(|_| "Writer thread panicked")?
+            .map_err(|e| e.into())
     }
 }

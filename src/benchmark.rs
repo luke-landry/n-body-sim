@@ -1,11 +1,9 @@
-use glam::DVec3;
+use crate::cli::{Args, GravityMethod, IntegratorMethod};
+use crate::simulation::{Body, Parameters, Simulator};
 use serde::Serialize;
 use std::error::Error;
 use std::path::Path;
 use std::time::Instant;
-
-use crate::cli::{Args, GravityMethod, IntegratorMethod};
-use crate::simulation::{Body, Parameters, Simulator};
 
 #[derive(Debug, Serialize)]
 struct BenchmarkResult {
@@ -28,8 +26,12 @@ fn generate_bodies(n: usize) -> Vec<Body> {
     (0..n)
         .map(|i| Body {
             mass: 1.0,
-            position: DVec3::new(i as f64, 0.0, 0.0),
-            velocity: DVec3::new(0.0, 1.0, 0.0),
+            pos_x: i as f64,
+            pos_y: 0.0,
+            pos_z: 0.0,
+            vel_x: 0.0,
+            vel_y: 1.0,
+            vel_z: 0.0,
         })
         .collect()
 }
@@ -51,7 +53,7 @@ fn create_simulation(
     };
     let gravity = gravity_method.create(&parameters, bodies.len());
     let integrator = integrator_method.create(gravity, parameters.time_step, bodies.len());
-    Simulator::new(bodies, parameters, integrator)
+    Simulator::new(bodies, parameters, integrator, None)
 }
 
 fn run_benchmark(
