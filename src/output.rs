@@ -1,6 +1,6 @@
 use csv;
 use serde::Serialize;
-use std::path::PathBuf;
+use std::{io::BufWriter, io::Write, path::PathBuf};
 
 pub struct SimulationData {
     times: Vec<f64>,
@@ -69,16 +69,17 @@ impl SimulationDataWriter {
             None => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,
-                    "File must have a valid extension",
+                    "Output file must have a valid extension",
                 ));
             }
         };
 
         match format.as_str() {
             "csv" => self.write_csv(),
+            "nbody" => self.write_bin(),
             _ => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
-                "Unsupported file format",
+                "Unsupported output file format",
             )),
         }
     }
@@ -95,6 +96,22 @@ impl SimulationDataWriter {
                     z: batch.pos_z[i],
                 };
                 wtr.serialize(record)?;
+            }
+        }
+        wtr.flush()?;
+        Ok(())
+    }
+
+    fn write_bin(&self) -> Result<(), std::io::Error> {
+        let mut wtr = BufWriter::new(std::fs::File::create(&self.path)?);
+        wtr.write_all(b"NBODY001")?; // magic number (0x4E424F4459303031)
+        for batch in self.rx.iter() {
+            for i in 0..batch.len() {
+                wtr.write_all(&batch.times[i].to_le_bytes())?;
+                wtr.write_all(&batch.ids[i].to_le_bytes())?;
+                wtr.write_all(&batch.pos_x[i].to_le_bytes())?;
+                wtr.write_all(&batch.pos_y[i].to_le_bytes())?;
+                wtr.write_all(&batch.pos_z[i].to_le_bytes())?;
             }
         }
         wtr.flush()?;

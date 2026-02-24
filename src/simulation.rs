@@ -208,7 +208,7 @@ impl Simulator {
 
     pub fn run(&mut self) {
         let mut bodies = Bodies::from(self.bodies.as_slice());
-        let mut buffer = SimulationData::with_capacity(Self::BATCH_SIZE);
+        let mut buffer = SimulationData::with_capacity(Self::BATCH_SIZE); // TODO optimize batch size
         let one_percent_steps = (self.parameters.num_steps / 100).max(1);
         let mut time = 0.0;
 
@@ -225,8 +225,13 @@ impl Simulator {
                         &mut buffer,
                         SimulationData::with_capacity(Self::BATCH_SIZE),
                     );
-                    tx.send(batch)
-                        .expect("Failed to send simulation data batch");
+                    if let Err(e) = tx.send(batch) {
+                        eprintln!(
+                            "Failed to send simulation data batch: {}\nHalting simulation.",
+                            e
+                        );
+                        return;
+                    }
                 }
             }
 
@@ -241,7 +246,10 @@ impl Simulator {
         // record final state and send remaining data
         buffer.extend_from_step(time, &bodies.pos_x, &bodies.pos_y, &bodies.pos_z);
         if let Some(tx) = &self.tx {
-            tx.send(buffer).unwrap();
+            if let Err(e) = tx.send(buffer) {
+                eprintln!("Failed to send final simulation data batch: {}", e);
+                return;
+            }
         }
     }
 }

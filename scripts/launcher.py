@@ -25,7 +25,7 @@ from schema import BodyConfig, SimulationParameters, VisualizerConfig
 
 INITIAL_CONDITIONS_FILENAME = "initial_conditions.csv"
 CONFIG_FILENAME = "config.json"
-OUTPUT_FILENAME = "output.csv"
+OUTPUT_FILENAME = "output.nbody"
 
 
 # main menu for configuring, launching, and viewing a simulation
@@ -362,7 +362,9 @@ class Launcher(QWidget):
         )
 
     def launch_run_sim_only(self):
-        path = self.show_directory_select_dialog("Select location to run simulation")
+        path = self.show_directory_select_dialog(
+            "Select location to save simulation data"
+        )
         if not path:
             return
         sim_parameters = self.pack_simulation_parameters()
@@ -377,7 +379,7 @@ class Launcher(QWidget):
 
     def launch_view_sim(self):
         path = self.show_directory_select_dialog(
-            "Select simulation output file to view"
+            "Select simulation output directory to view"
         )
         if not path:
             return

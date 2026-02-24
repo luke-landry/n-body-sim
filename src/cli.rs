@@ -16,7 +16,7 @@ pub struct Args {
     #[arg(short, long, default_value = constants::DEFAULT_INITIAL_CONDITIONS_PATH)]
     pub initial_conditions_path: PathBuf,
 
-    /// Path to CSV file to save simulation output data
+    /// Path to csv or nbody file to save simulation output data
     #[arg(short, long, default_value = constants::DEFAULT_OUTPUT_PATH)]
     pub output_data_path: PathBuf,
 

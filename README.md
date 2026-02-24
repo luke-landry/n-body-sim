@@ -139,7 +139,7 @@ mass,pos_x,pos_y,pos_z,vel_x,vel_y,vel_z
 
 #### **CSV**
 
-Output can be saved in a CSV file with time series data for all bodies:
+Output can be saved to a CSV file with time series data for all bodies:
 | Column | Type  | Description           |
 | ------ | ----- | ----------------------|
 | `time` | float | Timestamp             |
@@ -162,9 +162,9 @@ time,id,x,y,z
 ...
 ```
 
-#### **Binary (*planned*)**
+#### **Binary**
 
-For better performance and smaller file sizes, especially for large simulations, output can be saved to a (little-endian) binary format:
+For more efficient file sizes, especially for large simulations, output can be saved to a binary file format:
 
 | **Field** | **Type** | **Size (Bytes)** | **Description**                             |
 | --------- | -------- | ---------------- | --------------------------------------------|
@@ -174,9 +174,7 @@ For better performance and smaller file sizes, especially for large simulations,
 | `y`       | `f64`    | 8                | The y-coordinate of the body's position.    |
 | `z`       | `f64`    | 8                | The z-coordinate of the body's position.    |
 
-The file extension for binary output data files is `.nbody` and every file begins with an 8-byte magic number: `0x4E424F4459303031` (ASCII `NBODY001`)
-
-**Structure**
+The file extension for binary output data files is `.nbody` and the file begins with an 8-byte magic number: `0x4E424F4459303031` (ASCII `NBODY001`). Each record consists of the five 64-bit (little-endian 8-byte) fields: time, id, and the x, y, z coordinates of the body's position at that time step, for a total of 40 bytes per record.
 ```
 [0x4E424F4459303031][time][id][x][y][z][time][id][x][y][z]...
 ```

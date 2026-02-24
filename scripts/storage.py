@@ -138,8 +138,34 @@ def load_simulation_data_from_csv(csv_path: Path) -> SimulationData:
 
 
 def load_simulation_data_from_bin(bin_path: Path) -> SimulationData:
-    # TODO implement binary sim data file format
-    raise RuntimeError("Binary simulation data format not supported yet")
+    with open(bin_path, "rb") as f:
+        magic = f.read(8)
+        if magic != b"NBODY001":
+            raise ValueError("Invalid binary format: missing magic header")
+        data = f.read()
+
+    dtype = np.dtype(
+        [
+            ("time", np.float64),
+            ("id", np.uint64),
+            ("x", np.float64),
+            ("y", np.float64),
+            ("z", np.float64),
+        ]
+    )
+
+    arr = np.frombuffer(data, dtype=dtype)
+
+    times = arr["time"].astype(np.float32)
+    ids = arr["id"]
+    positions = np.stack((arr["x"], arr["y"], arr["z"]), axis=-1).astype(np.float32)
+
+    unique_times = np.unique(times)
+    unique_ids = np.unique(ids)
+
+    # reshape positions to (T, N, 3)
+    positions = positions.reshape(len(unique_times), len(unique_ids), 3)
+    return SimulationData(positions, unique_times, unique_ids)
 
 
 def load_simulation_data_from_path(path: Path) -> SimulationData:
