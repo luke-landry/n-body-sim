@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -329,6 +330,9 @@ class Launcher(QWidget):
         if not csv_path:
             return
         json_path = csv_path.parent / CONFIG_FILENAME
+
+        if not json_path.exists():
+            json_path = None  # allow loading scenario without config
 
         sim_params = None
         visualizer_config = None
