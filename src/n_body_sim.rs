@@ -1,4 +1,4 @@
-use crate::cli::Args;
+use crate::args::Args;
 use crate::input;
 use crate::output::SimulationDataWriter;
 use crate::simulation::{Parameters, Simulator};

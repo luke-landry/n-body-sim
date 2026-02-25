@@ -9,6 +9,7 @@ use crate::integrators::{
 use crate::simulation::Parameters;
 use clap::{Parser, ValueEnum};
 use std::path::PathBuf;
+use std::str::FromStr;
 
 #[derive(Parser)]
 pub struct Args {
@@ -51,31 +52,23 @@ pub struct Args {
     /// Flag to enable percent progress output to stdout
     #[arg(long)]
     pub progress: bool,
+}
 
-    /// Flag to run benchmarks instead of a simulation.
-    /// When set, the file paths and gravity and integrator parameters are ignored
-    #[arg(long)]
-    pub benchmark: bool,
-
-    /// Flag to specify the N values to use for benchmarks (comma-separated list, e.g. "10,50,250")
-    #[arg(long, value_delimiter = ',', default_value = constants::DEFAULT_BENCHMARK_N_VALUES)]
-    pub benchmark_n_values: Vec<usize>,
-
-    /// Comma-separated list of gravity methods to use for benchmarks
-    #[arg(long, value_delimiter = ',', default_value = constants::DEFAULT_BENCHMARK_GRAVITY_METHODS)]
-    pub benchmark_gravity_methods: Vec<GravityMethod>,
-
-    /// Comma-separated list of integrator methods to use for benchmarks
-    #[arg(long, value_delimiter = ',', default_value = constants::DEFAULT_BENCHMARK_INTEGRATOR_METHODS)]
-    pub benchmark_integrator_methods: Vec<IntegratorMethod>,
-
-    /// Number of benchmark runs per N-gravity-integrator combination
-    #[arg(long, default_value_t = constants::DEFAULT_BENCHMARK_NUM_RUNS)]
-    pub benchmark_num_runs: usize,
-
-    /// Path to CSV file to save benchmark results
-    #[arg(long, default_value = constants::DEFAULT_BENCHMARK_OUTPUT_PATH)]
-    pub benchmark_output_path: PathBuf,
+impl Default for Args {
+    fn default() -> Self {
+        Args {
+            initial_conditions_path: PathBuf::from(constants::DEFAULT_INITIAL_CONDITIONS_PATH),
+            output_data_path: PathBuf::from(constants::DEFAULT_OUTPUT_PATH),
+            g_constant: constants::DEFAULT_G,
+            time_step: constants::DEFAULT_TIMESTEP,
+            num_steps: constants::DEFAULT_NUM_STEPS,
+            softening_factor: constants::DEFAULT_SOFTENING_FACTOR,
+            theta: constants::DEFAULT_THETA,
+            gravity: constants::DEFAULT_GRAVITY.parse().unwrap(),
+            integrator: constants::DEFAULT_INTEGRATOR.parse().unwrap(),
+            progress: false,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
@@ -106,6 +99,19 @@ impl GravityMethod {
     }
 }
 
+impl FromStr for GravityMethod {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "newton" => Ok(GravityMethod::Newton),
+            "newton-parallel" => Ok(GravityMethod::NewtonParallel),
+            "barnes-hut" => Ok(GravityMethod::BarnesHut),
+            _ => Err(format!("Invalid gravity method: {}", s)),
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, ValueEnum)]
 pub enum IntegratorMethod {
     Euler,
@@ -132,6 +138,19 @@ impl IntegratorMethod {
                     gravity, time_step, num_bodies,
                 ))
             }
+        }
+    }
+}
+
+impl FromStr for IntegratorMethod {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "euler" => Ok(IntegratorMethod::Euler),
+            "velocity-verlet" => Ok(IntegratorMethod::VelocityVerlet),
+            "runge-kutta" => Ok(IntegratorMethod::RungeKutta),
+            _ => Err(format!("Invalid integrator method: {}", s)),
         }
     }
 }
