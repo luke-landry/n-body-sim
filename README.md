@@ -4,7 +4,7 @@ A simulator for how multiple objects in space (bodies) move and interact with ea
 ![cover](images/cover.png)
 
 ## Overview
-This project implements an N-body simulator that models the gravitational interactions between bodies in 3D using various numerical integration methods. The physics engine is written in Rust, and the configuration and visualization GUIs are implemented in Python using the Qt framework and VisPy.
+This project implements an N-body simulator that models the gravitational interactions between bodies in 3D using various numerical integration methods and algorithms. The physics engine is written in Rust, and the configuration and visualization GUIs are implemented in Python using the Qt framework and VisPy.
 
 ## Quick Start
 ### Prerequisites
@@ -234,7 +234,7 @@ A larger $\epsilon$ increases numerical stability by smoothing out interactions,
 3. Enter the container with `docker exec -it n-body-sim bash`
 
 
-### Build Physics Engine Executable
+### Targets
   - Linux: `cargo build`
   - Windows: `cargo build --target x86_64-pc-windows-gnu`
 

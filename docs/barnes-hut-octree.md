@@ -4,7 +4,9 @@
 
 An octree is a tree data structure where each node has 8 children, and can be used to represent regions of 3D space, where each node corresponds to a cubic region. The root node represents the entire cube of space, and each child node represents a subdivision of that space into 8 smaller cubes (octants).
 
-In the the Barnes-Hut algorithm, an octree is used to efficiently compute gravitational forces between bodies. Each internal node in the octree contains information about the total mass and Center of Mass (CoM) of its children, and each leaf node contains information about the masses and positions bodies it contains, as well as their total mass and CoM. When a computing the gravitational forces on a target body, the algorithm traverses the octree, and for each node, it checks if the node is sufficiently far away from the target body to be approximated. How the algorithm determines if a node is far enough to approximate is based on the ratio of the size ($s$) of the node (the width of the cube it represents) to the distance ($d$) being less than a given threshold (denoted as $\theta$), given as $\frac{s}{d}<\theta$. If this condition is satisfied, the algorithm uses the total mass and CoM of that node to approximate the gravitational force from all the bodies contained within that node. Otherwise, the algorithm traverses each of the node's children nodes to compute the forces from those smaller subdivisions of space until the criterion is met or it reaches leaf nodes, in which case it directly computes the gravitational force of the target based on the masses and positions of bodies in the leaf nodes. If $\theta=0$, the criterion will never be satisfied since $s>0$ and $d<\infty$, so for $N$ bodies, the algorithm will simply sum the forces individually which leads to a time complexity of $O(N^2)$. However, as the approximation threshold $\theta$ increases, the time complexity of calculating the forces on a target body approaches $O(N\ log\ N)$, which is much faster for large $N$, but reduces the accuracy of the force calculations as more of the forces are approximated.
+In the the Barnes-Hut algorithm, an octree is used to efficiently compute gravitational forces between bodies. Each internal node in the octree contains information about the total mass and Center of Mass (CoM) of its children, and each leaf node contains information about the masses and positions bodies it contains, as well as their total mass and CoM. When a computing the gravitational forces on a target body, the algorithm traverses the octree, and for each node, it checks if the node is sufficiently far away from the target body to be approximated. How the algorithm determines if a node is far enough to approximate is based on the ratio of the size ($s$) of the node (the width of the cube it represents) to the distance ($d$) being less than a given threshold (denoted as $\theta$), given as $\frac{s}{d}<\theta$. If this condition is satisfied, the algorithm uses the total mass and CoM of that node to approximate the gravitational force from all the bodies contained within that node. Otherwise, the algorithm traverses each of the node's children nodes to compute the forces from those smaller subdivisions of space until the criterion is met or it reaches leaf nodes, in which case it directly computes the gravitational force of the target based on the masses and positions of bodies in the leaf nodes.
+
+If $\theta=0$, the criterion will never be satisfied since $s>0$ and $d<\infty$, so for $N$ bodies, the algorithm will simply sum the forces individually which leads to a time complexity of $O(N^2)$. However, as the approximation threshold $\theta$ increases, the time complexity of calculating the forces on a target body approaches $O(N\ log\ N)$, which is much faster for large $N$, but reduces the accuracy of the force calculations as more of the forces are approximated.
 
 The nodes of a Barnes-Hut octree:
 - **root node**: represents the entire space and contains the total mass and center of mass of all bodies.
@@ -19,31 +21,31 @@ The intuitive way to implement an octree would be to use an AoS (Array of Struct
 
 In order to preallocate the arrays for the octree nodes, we need to determine the maximum possible number of nodes that can be created based on the number of bodies, the maximum number of bodies per leaf node, and the maximum depth of the tree.
 
-Letting
-    $N$ = number of bodies
-    $L$ = number of leaf nodes
-    $C$ = max number of bodies per leaf node
-    $I$ = number of internal nodes
-    $D$ = maximum depth of the tree
-    $T$ = total number of nodes
+Letting  
+    $N$ = number of bodies  
+    $L$ = number of leaf nodes  
+    $C$ = max number of bodies per leaf node  
+    $I$ = number of internal nodes  
+    $D$ = maximum depth of the   
+    $T$ = total number of nodes  
 
-Using a sparse tree (empty leaves are not created), we can assume assume each leaf node contains at least 1 body ($C \geq 1$), so:
+Using a sparse tree (empty leaves are not created), we can assume assume each leaf node contains at least 1 body ($C \geq 1$), so:  
     $L \lt \frac{N}{C}$
 
-For a perfectly balanced tree, a node would be subdivided into 8 children and becomes an internal node if it contains more than $C$ bodies, so internal nodes must contain at least 1 body, which means:
+For a perfectly balanced tree, a node would be subdivided into 8 children and becomes an internal node if it contains more than $C$ bodies, so internal nodes must contain at least 1 body, which means:  
     $I \lt N$
 
-However, this calculation assumes the tree is full and perfectly balanced, which would occur if the bodies are uniformly distributed in space, which is usually not the case. For example, in a situation where there are at least two bodies far apart, with one or both of these bodies having another body very close to it, the tree can become highly unbalanced, since the root node needs to cover the large distance between the two, and then this node has to be repeatedly subdivided to distinguish the bodies that are close together. A sun-earth-moon scenario is an example of this: the Earth and Moon are very close together compared to the distance between the Sun and Earth, so the octree's root covers the large distance between the Earth and Sun, but then would need to be subdivided many times so that the Earth and Moon lie in separate octants, leading to a large number of internal nodes. 
+However the tree would not be perfectly balanced unless the bodies are uniformly distributed in space, which is usually not the case. For example, in a situation where there are at least two bodies far apart, with one or both of these bodies having another body very close to it, the tree can become highly unbalanced, since the root node needs to cover the large distance between the two, and then this node has to be repeatedly subdivided to distinguish the bodies that are close together. A sun-earth-moon scenario is an example of this: the Earth and Moon are very close together compared to the distance between the Sun and Earth, so the octree's root covers the large distance between the Earth and Sun, but then would need to be subdivided many times so that the Earth and Moon lie in separate octants, leading to a large number of internal nodes. 
 
-So, to handle a theoretical worst-case scenario where all leaves ($L$) reach the maximum possible depth of the tree ($D$), which means they each have $D$ parent internal nodes (including the root node), $I$ would be calculated as:
+So, to handle a theoretical worst-case scenario where all leaves ($L$) reach the maximum possible depth of the tree ($D$), which means they each have $D$ parent internal nodes (including the root node), $I$ would be calculated as:  
   $I\lt LD$
 
-Plugging these inequalities for $L$ and $I$ into the total of $T=L+I$:
+Plugging these inequalities for $L$ and $I$ into the total of $T=L+I$:  
   $T=L+I\lt \frac{N}{C}+LD=\frac{N}{C}+\frac{N}{C}D=\frac{N}{C}(1+D)$
 
 Thus, SoA arrays storing node information can be preallocated with a capacity of $\frac{N}{C}(1+D)$, and SoA arrays storing body information can be preallocated with a capacity of $N$. This allows the arrays to be reused across multiple time steps, and the octree can be rebuilt in-place at each time step by overwriting the node and body information in the arrays, instead of needing to dynamically allocate these arrays at each time step.
 
-To efficiently organize the contiguous arrays of nodes/body information, we can use Morton codes. Morton codes, also known as Z-order curves, are a way to encode multi-dimensional data (like 3D coordinates) into a single dimension while preserving spatial locality. This means that points that are close together in 3D space will also be close together in the 1D Morton code space.
+To efficiently organize the contiguous arrays of nodes/body information, we can use Morton codes. Morton codes, also known as Z-order curves, are a way to encode multi-dimensional data (like 3D coordinates) into a single dimension while preserving spatial locality. This means that points that are close together in 3D space will also be relatively close together in the 1D Morton code space.
 ### Morton Codes
 
 A Morton code takes the binary representation of positive integer (x, y, z) coordinates and interleaves their bits to create a single integer. For example, if we use 5 bits for each coordinate, we can take the bits of x, y, and z and interleave them from MSBs to LSBs to create a 15-bit Morton code in this pattern:
@@ -78,9 +80,9 @@ to give a 9 bit Morton code, and a body:
 
 The nodes of the octree this body belongs to can be identified by the 3-bit groupings:
 0. **level 0:** root node (since all bodies belong in the root node)
-1. **level 1:** 5th child node of root node (since the first 3 bits of the morton code are b101 = 5)
-2. **level 2:** 3rd child node of L1 node (since the next 3 bits of the morton code are b110 = 6)
-3. **level 3:** 6th child node of L2 node (since the last 3 bits of the morton code are b011 = 3)
+1. **level 1:** 3rd child node of root node (since the first 3 bits of the morton code are b011 = 3)
+2. **level 2:** 2nd child node of L1 node (since the next 3 bits of the morton code are b010 = 2)
+3. **level 3:** 4th child node of L2 node (since the last 3 bits of the morton code are b100 = 4)
 
 To convert f64 $(x, y, z)$ coordinates into the positive 21-bit integers that can be interleaved into
 a Morton code, the f64 values need to be quantized into the range of $[0,\ 2^{21} - 1]$. This is done
