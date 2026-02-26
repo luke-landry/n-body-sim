@@ -3,7 +3,7 @@ set -e
 
 VENV_DIR=".venv"
 PYTHON_VENV="$VENV_DIR/bin/python"
-SCRIPT="scripts/main.py"
+SCRIPT="gui/main.py"
 
 # Check if virtual environment exists
 if [ ! -f "$PYTHON_VENV" ]; then
