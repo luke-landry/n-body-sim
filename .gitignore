@@ -3,7 +3,7 @@
 target/
 data/*
 !data/examples/
-scripts/__pycache__/
+gui/__pycache__/
 n-body-sim*
 *.old
 .zed/

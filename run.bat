@@ -4,7 +4,7 @@ setlocal
 :: Set variables
 set "VENV_DIR=.venv"
 set "PYTHON_VENV=%VENV_DIR%\Scripts\python.exe"
-set "SCRIPT=scripts\main.py"
+set "SCRIPT=gui\main.py"
 
 :: Check if virtual environment exists
 if not exist "%PYTHON_VENV%" (
