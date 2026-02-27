@@ -119,7 +119,9 @@ fn bench_barnes_hut_acceleration(c: &mut Criterion) {
 #[allow(dead_code)]
 fn bench_newton_parallel_vs_barnes_hut_acceleration(c: &mut Criterion) {
     let gravity_methods = [GravityMethod::NewtonParallel, GravityMethod::BarnesHut];
-    let n_values = [100, 200, 300, 400, 500, 750, 1000, 2000, 2500, 3000, 3500];
+    let n_values = [
+        2, 3, 5, 10, 25, 50, 100, 200, 300, 400, 500, 750, 1000, 2000, 2500, 3000,
+    ];
     bench_gravity_acceleration(c, &gravity_methods, &n_values);
 }
 
@@ -127,7 +129,8 @@ criterion_group!(
     benches, // macro-generated "benches" method
     // bench_newton_acceleration,
     // bench_newton_parallel_acceleration,
-    // bench_newton_vs_parallel_acceleration,
+    bench_newton_vs_parallel_acceleration,
+    // bench_barnes_hut_acceleration,
     bench_newton_parallel_vs_barnes_hut_acceleration,
 );
 criterion_main!(benches);
