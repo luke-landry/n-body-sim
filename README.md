@@ -4,19 +4,19 @@ A simulator for how multiple objects in space (bodies) move and interact with ea
 ![cover](images/cover.png)
 
 ## Overview
-This project implements an N-body simulator that models the gravitational interactions between bodies in 3D using various numerical integration methods and algorithms. The physics engine is written in Rust, and the configuration and visualization GUIs are implemented in Python using the Qt framework and VisPy.
+This project implements an N-body simulator that models the gravitational interactions between bodies in 3D using various numerical integration methods and algorithms. The physics engine is written in Rust, and the GUI is implemented in Python using the Qt framework and VisPy.
 
 ## Quick Start
 ### Prerequisites
 - Python installed
 
 ### Windows Setup
-1. Download and extract the latest Windows release zip
+1. Download and extract the latest Windows release zip, or clone the repository
 2. Run `install.bat` to setup the Python virtual environment and install required packages (first time only)
 3. Run `run.bat` to start the application
 
 ### Linux Setup
-1. Download and extract the latest Linux release tarball
+1. Download and extract the latest Linux release tarball, or clone the repository
 2. Run `install.sh` to setup the Python virtual environment and install required packages (first time only)
     - On Debian/Ubuntu, you may need to install `python3-venv` with `sudo apt install python3-venv` before running this install script
 3. Run `run.sh` to start the application
@@ -85,13 +85,13 @@ The visualizer supports two camera modes:
 - **Timeline**: Click and drag on the slider or click at any point to jump to a specific time step in the simulation
 
 ## CLI Usage
-The Rust physics engine can also be run independently without installing Python or using the GUI tools.
+The Rust physics engine executable can also be run independently without installing Python or using the GUI tools.
 
 ### Command Line Options
 
 **General Usage**
 - `-i, --initial-conditions-path`: Path to a CSV file containing the initial conditions for each body in the simulation. Each row should represent a body with its mass, initial position, and initial velocity. Default: `initial_conditions.csv`
-- `-o, --output-data-path`: Path to a CSV file where the simulation output data will be saved. Default: `output.csv`
+- `-o, --output-data-path`: Path to a csv or nbody file where the simulation output data will be saved. Default: `output.csv`
 - `-g, --g-constant`: The gravitational constant to use in the gravitational force calculations. This is a scaling factor that affects the strength of the gravitational interactions between bodies. Default: `1.0`
 - `-t, --time-step`: The time step in seconds for the simulation. This determines how frequently the positions and velocities of the bodies are updated. A smaller time step can lead to more accurate results but will increase the computation time. Default: `0.01`
 - `-n, --num-steps`: The total number of time steps to simulate. This determines the overall duration of the simulation. For example, with a time step of 0.01 seconds and 10000 steps, the simulation will cover a total of 100 seconds of simulated time. Default: `10000`
@@ -99,18 +99,18 @@ The Rust physics engine can also be run independently without installing Python 
 - `--theta`: The theta value is used in the Barnes-Hut gravity calculation method to determine when to approximate a group of distant bodies as a single combined mass. A smaller theta value results in a more accurate simulation but increases computation time, while a larger theta value reduces accuracy but improves performance. Default: `0.5`
 - `--gravity`: The method to use for calculating gravitational forces between bodies. The options are `newton`, `newton-parallel`, and `barnes-hut`. Default: `newton`
 - `--integrator`: The numerical integration method to use for updating the positions and velocities of the bodies at each time step. The options are `euler`, `velocity-verlet`, and `runge-kutta`. Default: `euler`
-- `-h --help`: Displays the help message with all available command line options, including those not listed here (e.g., benchmark options).
+- `-h --help`: Displays the help message with all available command line options
 
 ### Examples
 
 **Windows:**
 ```
-.\n-body-sim.exe -i data/examples/figure-eight.csv -o data/output.csv --time-step 0.01 --num-steps 10000 --integrator velocity-verlet
+bin\n-body-sim.exe -i data/examples/figure-eight/initial_conditions.csv -o data/output.csv --time-step 0.01 --num-steps 10000 --integrator velocity-verlet
 ```
 
 **Linux:**
 ```
-./n-body-sim -i data/examples/figure-eight.csv -o data/output.csv --time-step 0.01 --num-steps 10000 --integrator velocity-verlet
+bin/n-body-sim -i data/examples/figure-eight/initial_conditions.csv -o data/output.csv --time-step 0.01 --num-steps 10000 --integrator velocity-verlet
 ```
 
 ## Data Formats
