@@ -35,11 +35,7 @@ fn generate_distributed_bodies_positions(n: usize) -> (Vec<f64>, Vec<f64>, Vec<f
     (masses, rx, ry, rz)
 }
 
-fn bench_gravity_acceleration(
-    c: &mut Criterion,
-    gravity_methods: &[GravityMethod],
-    n_values: &[usize],
-) {
+fn bench_gravity_methods(c: &mut Criterion, gravity_methods: &[GravityMethod], n_values: &[usize]) {
     let args = Args::default();
     let parameters = Parameters::new(
         args.time_step,
@@ -50,7 +46,13 @@ fn bench_gravity_acceleration(
         args.progress,
     );
 
-    let mut group = c.benchmark_group("Gravity");
+    let group_name = gravity_methods
+        .iter()
+        .map(|s| format!("{:?}", s))
+        .collect::<Vec<_>>()
+        .join("-vs-");
+
+    let mut group = c.benchmark_group(group_name);
     for gravity_method in gravity_methods {
         for &n in n_values {
             let (masses, rx, ry, rz) = generate_distributed_bodies_positions(n);
@@ -90,39 +92,39 @@ fn bench_gravity_acceleration(
 fn bench_newton_acceleration(c: &mut Criterion) {
     let gravity_methods = [GravityMethod::Newton];
     let n_values = [2, 5, 10, 25, 50, 75, 100, 150, 200];
-    bench_gravity_acceleration(c, &gravity_methods, &n_values);
+    bench_gravity_methods(c, &gravity_methods, &n_values);
 }
 
 #[allow(dead_code)]
 fn bench_newton_parallel_acceleration(c: &mut Criterion) {
     let gravity_methods = [GravityMethod::NewtonParallel];
     let n_values = [2, 5, 10, 25, 50, 75, 100, 150, 200];
-    bench_gravity_acceleration(c, &gravity_methods, &n_values);
+    bench_gravity_methods(c, &gravity_methods, &n_values);
 }
 
 #[allow(dead_code)]
 fn bench_newton_vs_parallel_acceleration(c: &mut Criterion) {
     let gravity_methods = [GravityMethod::Newton, GravityMethod::NewtonParallel];
     let n_values = [
-        2, 3, 5, 8, 12, 16, 20, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500,
+        3, 5, 10, 15, 20, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500,
     ];
-    bench_gravity_acceleration(c, &gravity_methods, &n_values);
+    bench_gravity_methods(c, &gravity_methods, &n_values);
 }
 
 #[allow(dead_code)]
 fn bench_barnes_hut_acceleration(c: &mut Criterion) {
     let gravity_methods = [GravityMethod::BarnesHut];
     let n_values = [100, 200, 300, 400, 500, 750, 1000, 1500, 2000];
-    bench_gravity_acceleration(c, &gravity_methods, &n_values);
+    bench_gravity_methods(c, &gravity_methods, &n_values);
 }
 
 #[allow(dead_code)]
 fn bench_newton_parallel_vs_barnes_hut_acceleration(c: &mut Criterion) {
     let gravity_methods = [GravityMethod::NewtonParallel, GravityMethod::BarnesHut];
     let n_values = [
-        2, 3, 5, 10, 25, 50, 100, 200, 300, 400, 500, 750, 1000, 2000, 2500, 3000,
+        10, 25, 50, 100, 200, 300, 400, 500, 750, 1000, 1250, 1500, 2000, 2500, 3000,
     ];
-    bench_gravity_acceleration(c, &gravity_methods, &n_values);
+    bench_gravity_methods(c, &gravity_methods, &n_values);
 }
 
 criterion_group!(
