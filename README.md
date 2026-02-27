@@ -29,6 +29,12 @@ This project implements an N-body simulator that models the gravitational intera
 5. Use the WASD, QE, and FC keys to move and left-click mouse-drag to look around
 6. You can close the visualizer window at any time and go back to the launcher to load a different configuration or run a new simulation. The launcher stays open while the visualizer is running, so you can launch multiple simulations and have multiple visualizer windows open at the same time.
 
+### Generate a Random Simulation
+1. Start the application using the instructions above
+2. Under the "Generate Scenario" section, select a generator type (e.g. "Star System"), number of bodies `n` (e.g. 100), and radius `r` (e.g. 10.0), then click "Generate Scenario" to create a random initial conditions configuration
+3. Click "Launch and View Simulation" to run the simulation and see the results.  
+**Note:** disable the "Enable Trails" option in the visualization configuration for better performance when viewing 100+ bodies, as rendering trails for many bodies can cause lag during playback.
+
 See the [GUI Usage](#gui-usage) and [CLI Usage](#cli-usage) sections below for more details on how to use the application.
 
 ## GUI Usage

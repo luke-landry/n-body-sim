@@ -51,7 +51,7 @@ class Launcher(QWidget):
         print("Launcher started")
 
     def initialize_ui(self):
-        self.setWindowTitle("N-Body Launcher")
+        self.setWindowTitle("N-Body-Sim Launcher")
         self.setMinimumSize(700, 500)
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
