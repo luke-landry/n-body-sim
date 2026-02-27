@@ -103,15 +103,6 @@ fn bench_newton_parallel_acceleration(c: &mut Criterion) {
 }
 
 #[allow(dead_code)]
-fn bench_newton_vs_parallel_acceleration(c: &mut Criterion) {
-    let gravity_methods = [GravityMethod::Newton, GravityMethod::NewtonParallel];
-    let n_values = [
-        3, 5, 10, 15, 20, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500,
-    ];
-    bench_gravity_methods(c, &gravity_methods, &n_values);
-}
-
-#[allow(dead_code)]
 fn bench_barnes_hut_acceleration(c: &mut Criterion) {
     let gravity_methods = [GravityMethod::BarnesHut];
     let n_values = [100, 200, 300, 400, 500, 750, 1000, 1500, 2000];
@@ -119,11 +110,29 @@ fn bench_barnes_hut_acceleration(c: &mut Criterion) {
 }
 
 #[allow(dead_code)]
+fn bench_newton_vs_parallel_acceleration(c: &mut Criterion) {
+    let gravity_methods = [GravityMethod::Newton, GravityMethod::NewtonParallel];
+    let n_values = [3, 5, 10, 15, 20, 25, 50, 75, 100, 150, 200, 250];
+    bench_gravity_methods(c, &gravity_methods, &n_values);
+}
+
+#[allow(dead_code)]
 fn bench_newton_parallel_vs_barnes_hut_acceleration(c: &mut Criterion) {
     let gravity_methods = [GravityMethod::NewtonParallel, GravityMethod::BarnesHut];
     let n_values = [
-        10, 25, 50, 100, 200, 300, 400, 500, 750, 1000, 1250, 1500, 2000, 2500, 3000,
+        100, 200, 300, 400, 500, 750, 1000, 1250, 1500, 1750, 2000, 2500,
     ];
+    bench_gravity_methods(c, &gravity_methods, &n_values);
+}
+
+#[allow(dead_code)]
+fn bench_all_methods_acceleration(c: &mut Criterion) {
+    let gravity_methods = [
+        GravityMethod::Newton,
+        GravityMethod::NewtonParallel,
+        GravityMethod::BarnesHut,
+    ];
+    let n_values = [5, 10, 25, 50, 100, 250, 500, 750, 1000, 1500, 2000, 2500];
     bench_gravity_methods(c, &gravity_methods, &n_values);
 }
 
@@ -131,8 +140,9 @@ criterion_group!(
     benches, // macro-generated "benches" method
     // bench_newton_acceleration,
     // bench_newton_parallel_acceleration,
-    bench_newton_vs_parallel_acceleration,
     // bench_barnes_hut_acceleration,
+    bench_newton_vs_parallel_acceleration,
     bench_newton_parallel_vs_barnes_hut_acceleration,
+    bench_all_methods_acceleration,
 );
 criterion_main!(benches);
