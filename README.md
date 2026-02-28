@@ -6,6 +6,16 @@ A simulator for how multiple objects in space (bodies) move and interact with ea
 ## Overview
 This project implements an N-body simulator that models the gravitational interactions between bodies in 3D using various numerical integration methods and algorithms. The physics engine is written in Rust, and the GUI is implemented in Python using the Qt framework and VisPy.
 
+### Sections
+- [Quick Start](#quick-start)
+- [GUI Usage](#gui-usage)
+- [CLI Usage](#cli-usage)
+- [Data Formats](#data-formats)
+- [Theory](#theory)
+- [Build](#build)
+- [Benchmarks](#benchmarks)
+- [Design](#design)
+
 ## Quick Start
 ### Prerequisites
 - Python installed
@@ -185,14 +195,14 @@ The file extension for binary output data files is `.nbody` and the file begins 
 [0x4E424F4459303031][time][id][x][y][z][time][id][x][y][z]...
 ```
 
-## Background
+## Theory
 
 ### Physics
 The **N-body problem** involves predicting the individual motions of a group of objects interacting through gravitational force.
 - **2-Body problem**: Systems with two objects (e.g., a planet and a moon) have a "closed-form" solution. A single mathematical formula can calculate their exact positions at any point in the future.
 - **3-Body problem**: When a third object is added, the system becomes complex. Because the gravitational force on each object depends on the positions of all other objects, their motions are described by coupled differential equations. There is no general closed-form formula to solve these equations exactly. Instead, the system must be solved numerically by calculating the state of the system in small, successive time increments.
 
-For 3+ bodies, the system generally becomes chaotic, which means it is highly sensitive to initial conditions. Two systems starting with a difference even as small as one millimeter in position will eventually diverge into completely different configurations.
+For 3+ bodies, the system generally becomes chaotic, which means it is highly sensitive to initial conditions. Two systems starting with a difference even as small as one millimeter in position could eventually diverge into completely different configurations.
 
 
 ### Numerical Methods & Algorithms
@@ -208,8 +218,11 @@ In non-symplectic integrators, such as the standard Euler or Runge-Kutta methods
 
 #### **Gravity**
 These algorithms calculate the gravitational forces exerted on each body.
-- **Newtonian**: Calculates the force between every pair of bodies directly. This is perfectly accurate but slow for large systems, with a time complexity of $O(n^2)$.
+- **Newton**: Calculates the force between every pair of bodies directly. This is perfectly accurate but slow for large systems, with a time complexity of $O(n^2)$.
+- **Newton Parallel**: A multi-threaded version of the Newton method that calculates the forces on all bodies in parallel, improving performance for large systems compared to the single-threaded Newton method, but still has a time complexity of $O(n^2)$.
 - **Barnes-Hut**: An algorithm used for large-scale simulation (e.g. galaxies). It organizes bodies into an octree, treating distant groups of objects as a single combined mass based on a given approximation threshold $\theta$ (theta). This introduces a small approximation error but significantly improves performance to $O(n\ log\ n)$.
+
+While the **Newton** method is the slowest method in general, it has no threading overhead and so ends up being the fastest for small numbers of bodies (e.g. $n\lt 100$). The **Newton Parallel** method becomes significantly faster than the single-threaded Newton method for larger numbers of bodies (e.g. $n\geq 100$) due to its use of multiple threads, but still has a quadratic time complexity. The **Barnes-Hut** method has a better time complexity than the Newton methods, but much more overhead from having to build and traverse an octree, so it is most efficient for large systems (e.g. $n\geq 1000$). See the [Benchmarks](#benchmarks) section for more detailed performance comparisons of these methods at various numbers of bodies.
 
 #### **Softening Factor**
 Gravitational force is calculated using Newton's Law of Universal Gravitation:
@@ -244,5 +257,46 @@ A larger $\epsilon$ increases numerical stability by smoothing out interactions,
   - Linux: `cargo build`
   - Windows: `cargo build --target x86_64-pc-windows-gnu`
 
-## Benchmark
-To run benchmarks for all combinations of gravity and integrator methods at various body counts, pass the `--benchmark` flag to the executable. Or simply run `cargo run --release -- --benchmark` from the project root. The benchmark results will be saved to `benchmark_results.csv` unless otherwise specified with the `--benchmark-output-path` flag. See all benchmark options using the `--help` flag.
+## Benchmarks
+This project uses the criterion crate for benchmarking the physics engine. The benchmarks can be run using `cargo bench` and the results will be saved to the `target/criterion` directory as HTML reports which include automatically-generated graphs. The benchmarks contain performance comparisons of the different gravity calculation methods at various numbers of bodies. The gravity method combinations and n-values can be configured in the `benches/criterion_benchmarks.rs` file.
+
+**Note:** criterion tries to use `gnuplot` by default to generate graphs for the benchmark reports, so you may want to install it on your system. Otherwise, it uses the `plotters` crate to generate graphs.
+
+### Performance Comparisons
+The following benchmarks were done on a mini-PC with an Intel Core i5-12450H (8C/12T, up to 4.4GHz) CPU and 32GB of DDR4 3200MHz RAM running Ubuntu Server 24.04. The approximation threshold used for the Barnes-Hut method was $\theta=0.5$.
+
+The x-axis of the graphs are number of bodies, and the y-axis is the average time for a single acceleration calculation on all bodies.
+
+#### All Gravity Methods
+![benchmark-n-vs-np-vs-bh](images/benchmark-n-vs-np-vs-bh.svg)
+
+#### Newton Parallel vs Barnes-Hut
+![benchmark-np-vs-bh](images/benchmark-np-vs-bh.svg)
+
+#### Newton vs Newton Parallel
+![benchmark-n-vs-np](images/benchmark-n-vs-np.svg)
+
+## Design
+The project is organized into two main components: the Rust physics engine and the Python GUI tools. The physics engine is responsible for performing the N-body simulation calculations, while the GUI tools provide an interface for configuring simulations and viewing results.
+
+### Rust Physics Engine
+Rust was chosen for the physics engine due to its performance, safety guarantees, and modern features. The engine is designed to be modular and extensible, allowing for easy addition of new integrators, gravity calculation methods, and other features in the future.
+
+The source code of the Rust physics engine is in the `src` directory and contains the core logic for the N-body simulation, including the integrators, gravity calculation methods, and the core simulation loop. The integrators and gravity methods are implemented as traits, allowing for easy swapping and addition of new methods without modifying the core simulation logic. The core simulation loop iteratively updates the positions and velocities of the bodies based on the selected integrator and gravity method, and pushes the state of the system (body positions) at each step to a channel so as to not block the simulation for I/O operations, which are run in a separate thread. The simulation output data is streamed to a file in either CSV or binary format as it is generated, allowing for efficient handling of large simulations without consuming excessive memory storing huge generated datasets.
+
+The initial conditions are read into a vector of structs `bodies: Vec<Body>`, each containing the mass, position, and velocity of a body. This format is known as "array of structs" (AoS) which is intuitive and easy to work with for reading and writing file data. However, it is not the most efficient data format for computation, as the pointer-chasing required to access the fields of each body struct can lead to slower performance. It is also not an ideal format for performing vectorized operations for one field on all bodies at once during the simulation calculations, which is able to be accelerated with SIMD instructions.
+
+A more efficient format for computation is "struct of arrays" (SoA), where the body properties (mass, position, velocity) are stored in a struct `bodies: Bodies` containing equal-length arrays where each element corresponds to a body (e.g. for accessing the mass of the 5th body, it would be `bodies[5].mass` for AoS, and `bodies.masses[5]` in SoA). This allows for better cache locality because similar data is stored contiguously in memory, improving performance during the simulation calculations which often require operations on the properties of all bodies at once, such as updating the positions or velocities of all bodies in a step.
+
+The simulation initial conditions are read from the CSV file into an AoS format, and then converted to an SoA format for the simulation calculations.
+
+### Python GUI Tools
+The GUI tools are implemented in Python using the Qt framework and VisPy. Python was chosen for the GUI due to its rapid development speed and the availability of convenient libraries for handling large datasets, creating GUIs, and making interactive visualizations.
+
+The source code for the GUI tools is in the `gui` directory and contains the logic for the launcher and visualizer. The launcher allows users to configure simulation parameters, load initial conditions, generate random scenarios, and launch simulations. The visualizer provides an interactive 3D visualization of the simulation results, allowing users to play back the simulation and navigate the scene with different camera modes.
+
+The launcher runs the Rust physics engine executable as a subprocess, passing the necessary configuration arguments and initial conditions file path. This way, the simulation runs independently of the launcher, allowing the launcher to remain responsive during a simulation.
+
+It also runs the visualizer (which is a Python script) as a separate subprocess. The reason the visualizer is run as a separate subprocess instead of just being imported and called directly from the launcher is so that the visualizer doesn't block the launcher when it is loading the simulation output data, which can take a long time for large simulations. While this could also be solved by running the visualizer in a separate thread instead of a separate process, threads can only be safely terminated cooperatively, but if the visualizer thread is blocked on file I/O it cannot cooperatively check for termination signals from the launcher until it finishes loading, so the launcher would be unable to force-quit the visualizer if it the user wanted to cancel loading early. By running the visualizer as a separate process, the launcher can simply kill the visualizer process, which is safe to do at any time.
+
+Additional design notes are in the `docs` directory.
