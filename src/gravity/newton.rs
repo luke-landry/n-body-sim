@@ -104,54 +104,38 @@ pub fn compute_acceleration_for_body(
     let mut ax_i = 0.0;
     let mut ay_i = 0.0;
     let mut az_i = 0.0;
-    // split the loop into two to avoid the if statement for
-    //      if j != i { continue; }
-    // to avoid branching in a single loop
-    // TODO verify performance
-    for j in 0..i {
-        accumulate_acceleration(
-            g, eps2, masses[j], rx[j], ry[j], rz[j], rx_i, ry_i, rz_i, &mut ax_i, &mut ay_i,
-            &mut az_i,
-        );
-    }
-    for j in (i + 1)..n {
-        accumulate_acceleration(
-            g, eps2, masses[j], rx[j], ry[j], rz[j], rx_i, ry_i, rz_i, &mut ax_i, &mut ay_i,
-            &mut az_i,
-        );
+
+    // Compute the acceleration components for body i by summing the contributions from each other body j != i
+    for j in 0..n {
+        // Benchmarking shows negligible performance difference having this check
+        // in the loop instead of separating into two loops to avoid this branch
+        if j == i {
+            continue;
+        }
+
+        let m_j = masses[j];
+        let dx = rx[j] - rx_i;
+        let dy = ry[j] - ry_i;
+        let dz = rz[j] - rz_i;
+        let (ax_ij, ay_ij, az_ij) = compute_acceleration(g, eps2, m_j, dx, dy, dz);
+        ax_i += ax_ij;
+        ay_i += ay_ij;
+        az_i += az_ij;
     }
     (ax_i, ay_i, az_i)
 }
 
-// Accumulates the contribution to the acceleration of body i from body j using the formulas:
-//      a_ix += k*∆x
-//      a_iy += k*∆y
-//      a_iz += k*∆z
-// where
-//      k = (G * m_j) / (r^2 + ε^2)^(3/2)
-// to the current values of ax_i, ay_i, and az_i
-fn accumulate_acceleration(
+pub fn compute_acceleration(
     g: f64,
     eps2: f64,
     m_j: f64,
-    rx_j: f64,
-    ry_j: f64,
-    rz_j: f64,
-    rx_i: f64,
-    ry_i: f64,
-    rz_i: f64,
-    ax_i: &mut f64,
-    ay_i: &mut f64,
-    az_i: &mut f64,
-) {
-    let dx = rx_j - rx_i;
-    let dy = ry_j - ry_i;
-    let dz = rz_j - rz_i;
+    dx: f64,
+    dy: f64,
+    dz: f64,
+) -> (f64, f64, f64) {
     let r2 = (dx * dx) + (dy * dy) + (dz * dz);
     let inv_r_softened = 1.0 / (r2 + eps2).sqrt();
     let inv_r_softened_cubed = inv_r_softened * inv_r_softened * inv_r_softened;
     let k = g * m_j * inv_r_softened_cubed;
-    *ax_i += k * dx;
-    *ay_i += k * dy;
-    *az_i += k * dz;
+    (k * dx, k * dy, k * dz)
 }

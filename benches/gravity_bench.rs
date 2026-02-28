@@ -25,19 +25,19 @@ criterion_group!(
     /*
         Uncomment the benchmark functions below to run them
     */
-    // bench_newton_acceleration,
+    bench_newton_acceleration,
     // bench_newton_parallel_acceleration,
     // bench_barnes_hut_acceleration,
-    bench_newton_vs_parallel_acceleration,
-    bench_newton_parallel_vs_barnes_hut_acceleration,
-    bench_all_methods_acceleration,
+    // bench_newton_vs_parallel_acceleration,
+    // bench_newton_parallel_vs_barnes_hut_acceleration,
+    // bench_all_methods_acceleration,
 );
 criterion_main!(benches);
 
 #[allow(dead_code)]
 fn bench_newton_acceleration(c: &mut Criterion) {
     let gravity_methods = [Newton];
-    let n_values = [2, 5, 10, 25, 50, 75, 100, 150, 200];
+    let n_values = [2, 5, 10, 25, 50, 75, 100, 200, 300];
     bench_gravity_methods(c, &gravity_methods, &n_values);
 }
 
