@@ -1,4 +1,4 @@
-# Barnes Hut Octrees
+# Barnes-Hut Octree
 
 ## Overview
 

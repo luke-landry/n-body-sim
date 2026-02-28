@@ -5,7 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     # apt packages needed for development
-    git sudo mingw-w64 \
+    git sudo mingw-w64 gnuplot \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

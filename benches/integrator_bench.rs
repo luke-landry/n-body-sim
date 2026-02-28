@@ -135,4 +135,5 @@ fn bench_integrator_methods(
             }
         }
     }
+    group.finish();
 }

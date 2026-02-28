@@ -128,4 +128,5 @@ fn bench_gravity_methods(c: &mut Criterion, gravity_methods: &[GravityMethod], n
             );
         }
     }
+    group.finish();
 }

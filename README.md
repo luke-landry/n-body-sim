@@ -11,8 +11,8 @@ This project implements an N-body simulator that models the gravitational intera
 - [GUI Usage](#gui-usage)
 - [CLI Usage](#cli-usage)
 - [Data Formats](#data-formats)
-- [Theory](#theory)
 - [Build](#build)
+- [Theory](#theory)
 - [Benchmarks](#benchmarks)
 - [Design](#design)
 
@@ -195,6 +195,24 @@ The file extension for binary output data files is `.nbody` and the file begins 
 [0x4E424F4459303031][time][id][x][y][z][time][id][x][y][z]...
 ```
 
+## Build
+
+### Container Setup
+#### **Using Dev Containers**
+1. Launch the project in a dev container from your code editor using the configuration in `.devcontainer/devcontainer.json`
+
+#### **Manually with Docker installed**
+1. Build the development image with `docker build -t n-body-sim .`
+2. Run the development container with 
+    - Linux (bash): `docker run -dit -v $(pwd):/home/dev/n-body-sim --name n-body-sim n-body-sim`
+    - Windows (PS): `docker run -dit -v ${PWD}:/home/dev/n-body-sim --name n-body-sim n-body-sim`
+3. Enter the container with `docker exec -it n-body-sim bash`
+
+
+### Targets
+  - Linux: `cargo build`
+  - Windows: `cargo build --target x86_64-pc-windows-gnu`
+
 ## Theory
 
 ### Physics
@@ -222,7 +240,9 @@ These algorithms calculate the gravitational forces exerted on each body.
 - **Newton Parallel**: A multi-threaded version of the Newton method that calculates the forces on all bodies in parallel, improving performance for large systems compared to the single-threaded Newton method, but still has a time complexity of $O(n^2)$.
 - **Barnes-Hut**: An algorithm used for large-scale simulation (e.g. galaxies). It organizes bodies into an octree, treating distant groups of objects as a single combined mass based on a given approximation threshold $\theta$ (theta). This introduces a small approximation error but significantly improves performance to $O(n\ log\ n)$.
 
-While the **Newton** method is the slowest method in general, it has no threading overhead and so ends up being the fastest for small numbers of bodies (e.g. $n\lt 100$). The **Newton Parallel** method becomes significantly faster than the single-threaded Newton method for larger numbers of bodies (e.g. $n\geq 100$) due to its use of multiple threads, but still has a quadratic time complexity. The **Barnes-Hut** method has a better time complexity than the Newton methods, but much more overhead from having to build and traverse an octree, so it is most efficient for large systems (e.g. $n\geq 1000$). See the [Benchmarks](#benchmarks) section for more detailed performance comparisons of these methods at various numbers of bodies.
+While the **Newton** method is the slowest method in general, it has no threading overhead and so ends up being the fastest for small numbers of bodies. The **Newton Parallel** method becomes significantly faster than the single-threaded Newton method for larger numbers of bodies due to its use of multiple threads, but still has a quadratic time complexity. The **Barnes-Hut** method has a better time complexity than the Newton methods, and is also implemented as multi-threaded. However it has much more overhead from having to build and traverse an octree along with the threading overhead, so it is only most efficient in very large systems. 
+
+See the [Benchmarks](#benchmarks) section for more detailed performance comparisons of these methods and algorithms at various numbers of bodies.
 
 #### **Softening Factor**
 Gravitational force is calculated using Newton's Law of Universal Gravitation:
@@ -239,45 +259,33 @@ $$
 
 A larger $\epsilon$ increases numerical stability by smoothing out interactions, but it makes the simulation less physically accurate at short ranges. A smaller $\epsilon$ provides higher physical accuracy but increases the risk of numerical instability during close encounters.
 
-## Build
-
-### Container Setup
-#### **Using Dev Containers**
-1. Launch the project in a dev container from your code editor using the configuration in `.devcontainer/devcontainer.json`
-
-#### **Manually with Docker installed**
-1. Build the development image with `docker build -t n-body-sim .`
-2. Run the development container with 
-    - Linux (bash): `docker run -dit -v $(pwd):/home/dev/n-body-sim --name n-body-sim n-body-sim`
-    - Windows (PS): `docker run -dit -v ${PWD}:/home/dev/n-body-sim --name n-body-sim n-body-sim`
-3. Enter the container with `docker exec -it n-body-sim bash`
-
-
-### Targets
-  - Linux: `cargo build`
-  - Windows: `cargo build --target x86_64-pc-windows-gnu`
-
 ## Benchmarks
-This project uses the criterion crate for benchmarking the physics engine. The benchmarks can be run using `cargo bench` and the results will be saved to the `target/criterion` directory as HTML reports which include automatically-generated graphs. The benchmarks contain performance comparisons of the different gravity calculation methods at various numbers of bodies. The gravity method combinations and n-values can be configured in the `benches/criterion_benchmarks.rs` file.
+This project uses the criterion crate for benchmarking the physics engine. The benchmarks can be run using `cargo bench` and the results will be saved to the `target/criterion` directory as HTML reports which include automatically-generated graphs. To benchmark the gravity methods only, use `cargo bench --bench gravity_bench`, and to benchmark the integrators only, use `cargo bench --bench integrator_bench`. The configure the methods and n-values used in the benchmarks, edit the `gravity_bench.rs` and `integrator_bench.rs` files in the `benches` directory.
 
 **Note:** criterion tries to use `gnuplot` by default to generate graphs for the benchmark reports, so you may want to install it on your system. Otherwise, it uses the `plotters` crate to generate graphs.
 
 ### Performance Comparisons
-The following benchmarks were done on a mini-PC with an Intel Core i5-12450H (8C/12T, up to 4.4GHz) CPU and 32GB of DDR4 3200MHz RAM running Ubuntu Server 24.04. The approximation threshold used for the Barnes-Hut method was $\theta=0.5$.
+The following benchmarks were done on a mini-PC with an Intel Core i5-12450H (8C/12T, up to 4.4GHz) CPU and 32GB of DDR4 3200MHz RAM running Ubuntu Server 24.04.
 
-The x-axis of the graphs are number of bodies, and the y-axis is the average time for a single acceleration calculation on all bodies.
 
-#### All Gravity Methods
+#### Integrators
+This benchmark compares the three integrators: Euler, Velocity-Verlet, and Runge-Kutta using the same gravity method (Newton) across different numbers of bodies. The x-axis represents the number of bodies, and the y axis is time to compute a single step of the simulation.
+
+![benchmark-e-vs-vv-vs-rk-u-n](images/benchmark-e-vs-vv-vs-rk-u-n.svg)
+
+This shows that the Euler integrator is the fastest, followed by Velocity-Verlet which is approximately 2x slower than Euler, and then Runge-Kutta which is approximately 4x slower than Euler. This is because Euler, Velocity Verlet, and Runge-Kutta perform 1, 2, and 4, acceleration calculations per step, respectively. So, given the same same gravity methods, the time difference between the integrators is a relatively consistent factor of 1x, 2x, or 4x for Euler, Velocity-Verlet, or Runge-Kutta, as the acceleration calculations dominate the overall computation time. The Euler method while being fast is the least accurate of the three, while the relatively slow Runge-Kutta is the most accurate, so there is a tradeoff between performance and accuracy when choosing an integrator.
+
+#### Gravity
+These benchmarks compare the three gravity calculation methods: Newton, Newton Parallel, and Barnes-Hut across different numbers of bodies. The x-axis represents the number of bodies, and the y axis is time to compute a single set of accelerations for all bodies. For the Barnes-Hut method, an approximation threshold of $\theta=0.5$ was used.
+
 ![benchmark-n-vs-np-vs-bh](images/benchmark-n-vs-np-vs-bh.svg)
-
-#### Newton Parallel vs Barnes-Hut
 ![benchmark-np-vs-bh](images/benchmark-np-vs-bh.svg)
-
-#### Newton vs Newton Parallel
 ![benchmark-n-vs-np](images/benchmark-n-vs-np.svg)
 
+These show that the single-threaded Newton method is the fastest for $n\lt 100$, while the multi-threaded Newton Parallel method becomes significantly faster than the single-threaded Newton method for $n\geq 100$, but still has a quadratic time complexity. The Barnes-Hut method has a better time complexity than the Newton methods, but much more initial overhead, so it is most efficient for large systems of $n\geq 1000$. Note that these exact n-value thresholds can vary based on the specific hardware that the benchmarks are run on, and especially the number of CPU cores available, which directly affects the performance of the multi-threaded Newton Parallel and Barnes-Hut methods.
+
 ## Design
-The project is organized into two main components: the Rust physics engine and the Python GUI tools. The physics engine is responsible for performing the N-body simulation calculations, while the GUI tools provide an interface for configuring simulations and viewing results.
+The project is organized into two main components: the Rust physics engine and the Python GUI tools. The physics engine is responsible for performing the N-body simulation, while the GUI tools provide an interface for configuring simulations and viewing results.
 
 ### Rust Physics Engine
 Rust was chosen for the physics engine due to its performance, safety guarantees, and modern features. The engine is designed to be modular and extensible, allowing for easy addition of new integrators, gravity calculation methods, and other features in the future.
