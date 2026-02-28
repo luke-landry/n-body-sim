@@ -1,6 +1,6 @@
 pub mod octree;
 
-use crate::gravity::{Gravity, barnes_hut::octree::BarnesHutOctree};
+use crate::gravity::{Gravity, barnes_hut::octree::BarnesHutOctree, newton::compute_acceleration};
 use rayon::prelude::*;
 
 pub struct BarnesHutGravity {
@@ -47,12 +47,4 @@ impl Gravity for BarnesHutGravity {
                     .compute_acceleration_for_body(i, acceleration_function);
             });
     }
-}
-
-fn compute_acceleration(g: f64, eps2: f64, m_j: f64, dx: f64, dy: f64, dz: f64) -> (f64, f64, f64) {
-    let r2 = (dx * dx) + (dy * dy) + (dz * dz);
-    let inv_r_softened = 1.0 / (r2 + eps2).sqrt();
-    let inv_r_softened_cubed = inv_r_softened * inv_r_softened * inv_r_softened;
-    let k = g * m_j * inv_r_softened_cubed;
-    (k * dx, k * dy, k * dz)
 }
