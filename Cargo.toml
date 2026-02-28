@@ -13,5 +13,9 @@ serde = { version = "1.0.228", features = ["derive"] }
 criterion = "0.8.2"
 
 [[bench]]
-name = "criterion_benchmarks"
+name = "gravity_bench"
+harness = false
+
+[[bench]]
+name = "integrator_bench"
 harness = false

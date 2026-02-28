@@ -65,6 +65,37 @@ pub struct Bodies {
 }
 
 impl Bodies {
+    pub fn new(
+        masses: Vec<f64>,
+        pos_x: Vec<f64>,
+        pos_y: Vec<f64>,
+        pos_z: Vec<f64>,
+        vel_x: Vec<f64>,
+        vel_y: Vec<f64>,
+        vel_z: Vec<f64>,
+    ) -> Self {
+        let len = masses.len();
+        assert!(
+            pos_x.len() == len
+                && pos_y.len() == len
+                && pos_z.len() == len
+                && vel_x.len() == len
+                && vel_y.len() == len
+                && vel_z.len() == len,
+            "All input vectors must have the same length"
+        );
+
+        Bodies {
+            masses,
+            pos_x,
+            pos_y,
+            pos_z,
+            vel_x,
+            vel_y,
+            vel_z,
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.masses.len()
     }

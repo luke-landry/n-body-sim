@@ -1,5 +1,11 @@
+mod common_bench;
+use common_bench::generate_distributed_bodies_positions;
+
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
-use n_body_sim::args::{Args, GravityMethod};
+use n_body_sim::args::{
+    Args, GravityMethod,
+    GravityMethod::{BarnesHut, Newton, NewtonParallel},
+};
 use n_body_sim::simulation::Parameters;
 
 /*
@@ -11,7 +17,7 @@ use n_body_sim::simulation::Parameters;
   The criterion_group! macro is used to specify which benchmark functions to run.
   Uncomment the desired benchmark functions to include them in the benchmark suite.
 
-  To run the benchmarks, run 'cargo bench' in the project root.
+  To run these benchmarks, run 'cargo bench --bench gravity_bench' in the project root.
 */
 
 criterion_group!(
@@ -30,35 +36,35 @@ criterion_main!(benches);
 
 #[allow(dead_code)]
 fn bench_newton_acceleration(c: &mut Criterion) {
-    let gravity_methods = [GravityMethod::Newton];
+    let gravity_methods = [Newton];
     let n_values = [2, 5, 10, 25, 50, 75, 100, 150, 200];
     bench_gravity_methods(c, &gravity_methods, &n_values);
 }
 
 #[allow(dead_code)]
 fn bench_newton_parallel_acceleration(c: &mut Criterion) {
-    let gravity_methods = [GravityMethod::NewtonParallel];
+    let gravity_methods = [NewtonParallel];
     let n_values = [2, 5, 10, 25, 50, 75, 100, 150, 200];
     bench_gravity_methods(c, &gravity_methods, &n_values);
 }
 
 #[allow(dead_code)]
 fn bench_barnes_hut_acceleration(c: &mut Criterion) {
-    let gravity_methods = [GravityMethod::BarnesHut];
+    let gravity_methods = [BarnesHut];
     let n_values = [100, 200, 300, 400, 500, 750, 1000, 1500, 2000];
     bench_gravity_methods(c, &gravity_methods, &n_values);
 }
 
 #[allow(dead_code)]
 fn bench_newton_vs_parallel_acceleration(c: &mut Criterion) {
-    let gravity_methods = [GravityMethod::Newton, GravityMethod::NewtonParallel];
+    let gravity_methods = [Newton, NewtonParallel];
     let n_values = [3, 5, 10, 15, 20, 25, 50, 75, 100, 150, 200, 250];
     bench_gravity_methods(c, &gravity_methods, &n_values);
 }
 
 #[allow(dead_code)]
 fn bench_newton_parallel_vs_barnes_hut_acceleration(c: &mut Criterion) {
-    let gravity_methods = [GravityMethod::NewtonParallel, GravityMethod::BarnesHut];
+    let gravity_methods = [NewtonParallel, BarnesHut];
     let n_values = [
         100, 200, 300, 400, 500, 750, 1000, 1250, 1500, 1750, 2000, 2500,
     ];
@@ -67,11 +73,7 @@ fn bench_newton_parallel_vs_barnes_hut_acceleration(c: &mut Criterion) {
 
 #[allow(dead_code)]
 fn bench_all_methods_acceleration(c: &mut Criterion) {
-    let gravity_methods = [
-        GravityMethod::Newton,
-        GravityMethod::NewtonParallel,
-        GravityMethod::BarnesHut,
-    ];
+    let gravity_methods = [Newton, NewtonParallel, BarnesHut];
     let n_values = [
         50, 100, 250, 500, 750, 1000, 1250, 1500, 1750, 2000, 2500, 3000,
     ];
@@ -117,11 +119,8 @@ fn bench_gravity_methods(c: &mut Criterion, gravity_methods: &[GravityMethod], n
                                 az.clone(),
                             )
                         },
-                        |tuple| {
-                            let (gravity_box, masses, rx, ry, rz, ax, ay, az) = tuple;
-                            gravity_box
-                                .as_mut()
-                                .calculate_accelerations(masses, rx, ry, rz, ax, ay, az);
+                        |(gravity, masses, rx, ry, rz, ax, ay, az)| {
+                            gravity.calculate_accelerations(masses, rx, ry, rz, ax, ay, az);
                         },
                         BatchSize::SmallInput,
                     );
@@ -129,34 +128,4 @@ fn bench_gravity_methods(c: &mut Criterion, gravity_methods: &[GravityMethod], n
             );
         }
     }
-}
-
-/// Generates a non-trivial deterministic distribution of bodies to
-/// for more realistic and consistent performance during benchmarks
-fn generate_distributed_bodies_positions(n: usize) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
-    let mut masses = Vec::with_capacity(n);
-    let mut rx = Vec::with_capacity(n);
-    let mut ry = Vec::with_capacity(n);
-    let mut rz = Vec::with_capacity(n);
-
-    // 20 x 20 x 20 bounding box
-    let radius = 10.0;
-    let height = 20.0;
-
-    let mass_base = 1.0;
-
-    for i in 0..n {
-        // Spiral distribution in x/y, layered in z
-        let angle = i as f64 * 0.61803398875; // golden angle for spacing
-        let r = radius * (i as f64) / (n as f64); // radius * i/n where i/n goes from 0 to 1
-        rx.push(r * angle.cos());
-        ry.push(r * angle.sin());
-
-        rz.push(height * ((i as f64) / (n as f64) - 0.5)); // z from -height/2 to +height/2
-
-        // Masses vary slightly but repeatably
-        masses.push(mass_base + (i % 10) as f64 * 0.1);
-    }
-
-    (masses, rx, ry, rz)
 }
