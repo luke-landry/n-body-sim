@@ -1,38 +1,81 @@
-// Criterion benchmarks for fast micro-benchmarks of individual functions
-// useful for testing the performance of specific code and logic optimizations
-
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use n_body_sim::args::{Args, GravityMethod};
 use n_body_sim::simulation::Parameters;
 
-/// Generates a non-trivial deterministic distribution of bodies to
-/// for more realistic and consistent performance during benchmarks
-fn generate_distributed_bodies_positions(n: usize) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
-    let mut masses = Vec::with_capacity(n);
-    let mut rx = Vec::with_capacity(n);
-    let mut ry = Vec::with_capacity(n);
-    let mut rz = Vec::with_capacity(n);
+/*
+  Criterion benchmarks for n-body simulation gravity methods
 
-    // 20 x 20 x 20 bounding box
-    let radius = 10.0;
-    let height = 20.0;
+  To configure these benchmarks, change the gravity_methods and
+  n_values arrays in the individual benchmark functions below.
 
-    let mass_base = 1.0;
+  The criterion_group! macro is used to specify which benchmark functions to run.
+  Uncomment the desired benchmark functions to include them in the benchmark suite.
 
-    for i in 0..n {
-        // Spiral distribution in x/y, layered in z
-        let angle = i as f64 * 0.61803398875; // golden angle for spacing
-        let r = radius * (i as f64) / (n as f64); // radius * i/n where i/n goes from 0 to 1
-        rx.push(r * angle.cos());
-        ry.push(r * angle.sin());
+  To run the benchmarks, run 'cargo bench' in the project root.
+*/
 
-        rz.push(height * ((i as f64) / (n as f64) - 0.5)); // z from -height/2 to +height/2
+criterion_group!(
+    benches, // macro-generated "benches" method
+    /*
+        Uncomment the benchmark functions below to run them
+    */
+    // bench_newton_acceleration,
+    // bench_newton_parallel_acceleration,
+    // bench_barnes_hut_acceleration,
+    bench_newton_vs_parallel_acceleration,
+    bench_newton_parallel_vs_barnes_hut_acceleration,
+    bench_all_methods_acceleration,
+);
+criterion_main!(benches);
 
-        // Masses vary slightly but repeatably
-        masses.push(mass_base + (i % 10) as f64 * 0.1);
-    }
+#[allow(dead_code)]
+fn bench_newton_acceleration(c: &mut Criterion) {
+    let gravity_methods = [GravityMethod::Newton];
+    let n_values = [2, 5, 10, 25, 50, 75, 100, 150, 200];
+    bench_gravity_methods(c, &gravity_methods, &n_values);
+}
 
-    (masses, rx, ry, rz)
+#[allow(dead_code)]
+fn bench_newton_parallel_acceleration(c: &mut Criterion) {
+    let gravity_methods = [GravityMethod::NewtonParallel];
+    let n_values = [2, 5, 10, 25, 50, 75, 100, 150, 200];
+    bench_gravity_methods(c, &gravity_methods, &n_values);
+}
+
+#[allow(dead_code)]
+fn bench_barnes_hut_acceleration(c: &mut Criterion) {
+    let gravity_methods = [GravityMethod::BarnesHut];
+    let n_values = [100, 200, 300, 400, 500, 750, 1000, 1500, 2000];
+    bench_gravity_methods(c, &gravity_methods, &n_values);
+}
+
+#[allow(dead_code)]
+fn bench_newton_vs_parallel_acceleration(c: &mut Criterion) {
+    let gravity_methods = [GravityMethod::Newton, GravityMethod::NewtonParallel];
+    let n_values = [3, 5, 10, 15, 20, 25, 50, 75, 100, 150, 200, 250];
+    bench_gravity_methods(c, &gravity_methods, &n_values);
+}
+
+#[allow(dead_code)]
+fn bench_newton_parallel_vs_barnes_hut_acceleration(c: &mut Criterion) {
+    let gravity_methods = [GravityMethod::NewtonParallel, GravityMethod::BarnesHut];
+    let n_values = [
+        100, 200, 300, 400, 500, 750, 1000, 1250, 1500, 1750, 2000, 2500,
+    ];
+    bench_gravity_methods(c, &gravity_methods, &n_values);
+}
+
+#[allow(dead_code)]
+fn bench_all_methods_acceleration(c: &mut Criterion) {
+    let gravity_methods = [
+        GravityMethod::Newton,
+        GravityMethod::NewtonParallel,
+        GravityMethod::BarnesHut,
+    ];
+    let n_values = [
+        50, 100, 250, 500, 750, 1000, 1250, 1500, 1750, 2000, 2500, 3000,
+    ];
+    bench_gravity_methods(c, &gravity_methods, &n_values);
 }
 
 fn bench_gravity_methods(c: &mut Criterion, gravity_methods: &[GravityMethod], n_values: &[usize]) {
@@ -88,61 +131,32 @@ fn bench_gravity_methods(c: &mut Criterion, gravity_methods: &[GravityMethod], n
     }
 }
 
-#[allow(dead_code)]
-fn bench_newton_acceleration(c: &mut Criterion) {
-    let gravity_methods = [GravityMethod::Newton];
-    let n_values = [2, 5, 10, 25, 50, 75, 100, 150, 200];
-    bench_gravity_methods(c, &gravity_methods, &n_values);
-}
+/// Generates a non-trivial deterministic distribution of bodies to
+/// for more realistic and consistent performance during benchmarks
+fn generate_distributed_bodies_positions(n: usize) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
+    let mut masses = Vec::with_capacity(n);
+    let mut rx = Vec::with_capacity(n);
+    let mut ry = Vec::with_capacity(n);
+    let mut rz = Vec::with_capacity(n);
 
-#[allow(dead_code)]
-fn bench_newton_parallel_acceleration(c: &mut Criterion) {
-    let gravity_methods = [GravityMethod::NewtonParallel];
-    let n_values = [2, 5, 10, 25, 50, 75, 100, 150, 200];
-    bench_gravity_methods(c, &gravity_methods, &n_values);
-}
+    // 20 x 20 x 20 bounding box
+    let radius = 10.0;
+    let height = 20.0;
 
-#[allow(dead_code)]
-fn bench_barnes_hut_acceleration(c: &mut Criterion) {
-    let gravity_methods = [GravityMethod::BarnesHut];
-    let n_values = [100, 200, 300, 400, 500, 750, 1000, 1500, 2000];
-    bench_gravity_methods(c, &gravity_methods, &n_values);
-}
+    let mass_base = 1.0;
 
-#[allow(dead_code)]
-fn bench_newton_vs_parallel_acceleration(c: &mut Criterion) {
-    let gravity_methods = [GravityMethod::Newton, GravityMethod::NewtonParallel];
-    let n_values = [3, 5, 10, 15, 20, 25, 50, 75, 100, 150, 200, 250];
-    bench_gravity_methods(c, &gravity_methods, &n_values);
-}
+    for i in 0..n {
+        // Spiral distribution in x/y, layered in z
+        let angle = i as f64 * 0.61803398875; // golden angle for spacing
+        let r = radius * (i as f64) / (n as f64); // radius * i/n where i/n goes from 0 to 1
+        rx.push(r * angle.cos());
+        ry.push(r * angle.sin());
 
-#[allow(dead_code)]
-fn bench_newton_parallel_vs_barnes_hut_acceleration(c: &mut Criterion) {
-    let gravity_methods = [GravityMethod::NewtonParallel, GravityMethod::BarnesHut];
-    let n_values = [
-        100, 200, 300, 400, 500, 750, 1000, 1250, 1500, 1750, 2000, 2500,
-    ];
-    bench_gravity_methods(c, &gravity_methods, &n_values);
-}
+        rz.push(height * ((i as f64) / (n as f64) - 0.5)); // z from -height/2 to +height/2
 
-#[allow(dead_code)]
-fn bench_all_methods_acceleration(c: &mut Criterion) {
-    let gravity_methods = [
-        GravityMethod::Newton,
-        GravityMethod::NewtonParallel,
-        GravityMethod::BarnesHut,
-    ];
-    let n_values = [5, 10, 25, 50, 100, 250, 500, 750, 1000, 1500, 2000, 2500];
-    bench_gravity_methods(c, &gravity_methods, &n_values);
-}
+        // Masses vary slightly but repeatably
+        masses.push(mass_base + (i % 10) as f64 * 0.1);
+    }
 
-criterion_group!(
-    benches, // macro-generated "benches" method
-    // bench_newton_acceleration,
-    // bench_newton_parallel_acceleration,
-    // bench_barnes_hut_acceleration,
-    bench_newton_vs_parallel_acceleration,
-    bench_newton_parallel_vs_barnes_hut_acceleration,
-    bench_all_methods_acceleration,
-);
-criterion_main!(benches);
+    (masses, rx, ry, rz)
+}
