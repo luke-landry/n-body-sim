@@ -1,5 +1,6 @@
 pub mod args;
 pub mod constants;
+pub mod gpu;
 pub mod gravity;
 mod input;
 pub mod integrators;
