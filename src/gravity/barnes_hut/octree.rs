@@ -35,23 +35,14 @@ pub struct BarnesHutOctree {
     node_com_z: Vec<f64>,
     node_widths: Vec<f64>,
 
-    // per-node indices of children during tree construction, will be flattened into flat_node_children after construction
-    node_children: Vec<Vec<usize>>, // TODO replace with vec[max_nodes  * 8] for fully contiguous memory layout
-    node_children_count: Vec<usize>,
+    // per-node indices of children
+    node_children: Vec<Vec<usize>>,
 
     /// Points to the start and length of the block in the sorted body arrays.
     /// Due to Morton code sorting, all bodies in the same node will be
     /// in [node_bodies_start[i], node_bodies_start[i]+node_bodies_count[i]) in the body arrays.
     node_bodies_start: Vec<usize>,
     node_bodies_count: Vec<usize>,
-
-    /// Flattened list of sorted children node indices, where the children of each node are stored contiguously,
-    /// and the start index of each node's children in this array is given by node_children_start_idx.
-    flat_node_children: Vec<usize>,
-
-    /// flat_node_children_start_idx[i] points to the first of the contiguous existing children of node i in the node arrays.
-    /// If a node is a leaf, then usize::MAX is used as a sentinel value to indicate that it has no children.
-    flat_node_children_start_idx: Vec<usize>,
 }
 
 impl BarnesHutOctree {
@@ -91,12 +82,8 @@ impl BarnesHutOctree {
             node_com_z: vec![0.0; max_nodes],
             node_widths: vec![0.0; max_nodes],
             node_children: vec![Vec::with_capacity(8); max_nodes], // each node can have up to 8 children in an octree
-            node_children_count: vec![0; max_nodes],
             node_bodies_start: vec![usize::MAX; max_nodes], // usize::max as sentinel value (should never be encountered for non-existent nodes)
             node_bodies_count: vec![0; max_nodes],
-
-            flat_node_children: Vec::with_capacity(max_nodes), // reserving with capacity because this will be pushed to this during tree construction
-            flat_node_children_start_idx: vec![usize::MAX; max_nodes], // usize::max as sentinel value for leaf nodes
         }
     }
 
@@ -127,15 +114,6 @@ impl BarnesHutOctree {
         );
 
         self.build_recursive(0, masses.len(), Self::MAX_DEPTH, root_width);
-
-        // Flatten the node_children into flat_node_children and set flat_node_children_start_idx
-        for node_idx in 0..self.node_count {
-            let children = &self.node_children[node_idx];
-            if !children.is_empty() {
-                self.flat_node_children_start_idx[node_idx] = self.flat_node_children.len();
-                self.flat_node_children.extend_from_slice(children);
-            }
-        }
     }
 
     pub fn compute_acceleration_for_body<F: Fn(f64, f64, f64, f64) -> (f64, f64, f64)>(
@@ -192,13 +170,13 @@ impl BarnesHutOctree {
                     node_distance_squared.sqrt(),
                     bh_ratio,
                     self.theta,
-                    self.node_children_count[node_idx] == 0,
+                    self.node_children[node_idx].is_empty(),
                     self.node_bodies_count[node_idx],
                 );
             }
 
             // If node is a leaf
-            if self.node_children_count[node_idx] == 0 {
+            if self.node_children[node_idx].is_empty() {
                 // compute direct interaction with each body in this leaf node
                 let bodies_start = self.node_bodies_start[node_idx];
                 let bodies_end = bodies_start + self.node_bodies_count[node_idx];
@@ -257,12 +235,7 @@ impl BarnesHutOctree {
             }
             // If node is an internal node, traverse its children
             else {
-                let children_start_idx = self.flat_node_children_start_idx[node_idx];
-                let children_count = self.node_children_count[node_idx];
-                let children_end_idx = children_start_idx + children_count;
-                for i in children_start_idx..children_end_idx {
-                    stack.push(self.flat_node_children[i]);
-                }
+                stack.extend(&self.node_children[node_idx]);
             }
         }
         (ax, ay, az)
@@ -350,8 +323,6 @@ impl BarnesHutOctree {
         let node_children = &self.node_children[node_idx];
         let node_children_count = node_children.len();
 
-        self.node_children_count[node_idx] = node_children_count;
-
         // Aggregate mass/COM from children
         let (mass, com_x, com_y, com_z) = if node_children_count > 0 {
             self.compute_com_of_node_indices(&node_children)
@@ -387,6 +358,7 @@ impl BarnesHutOctree {
     }
 
     fn reset(&mut self) {
+        self.node_count = 0;
         self.body_masses.fill(0.0);
         self.body_pos_x.fill(0.0);
         self.body_pos_y.fill(0.0);
@@ -401,12 +373,8 @@ impl BarnesHutOctree {
         self.node_children
             .iter_mut()
             .for_each(|children| children.clear());
-        self.node_children_count.fill(0);
         self.node_bodies_start.fill(usize::MAX);
         self.node_bodies_count.fill(0);
-        self.flat_node_children.clear();
-        self.flat_node_children_start_idx.fill(usize::MAX);
-        self.node_count = 0;
     }
 
     fn compute_com_of_bodies_range(
@@ -533,7 +501,7 @@ fn morton_sort_bodies(
         })
         .collect();
 
-    morton_codes_and_idx.sort_unstable(); // TODO look into radix sort here
+    morton_codes_and_idx.sort_unstable();
 
     let mut morton_to_original_idx = Vec::with_capacity(n);
     let mut sorted_morton_codes = Vec::with_capacity(n);
@@ -602,11 +570,11 @@ fn morton_encode(x: u64, y: u64, z: u64) -> u64 {
 /// See: https://www.forceflow.be/2013/10/07/morton-encodingdecoding-through-bit-interleaving-implementations/
 fn morton_spread_bits(mut x: u64) -> u64 {
     x &= 0x1fffff; // ensure we only have 21 bits
-    x = (x | (x << 32)) & 0x1f00000000ffff; // & mask from but 63: 00000000
-    x = (x | (x << 16)) & 0x1f0000ff0000ff; //
-    x = (x | (x << 8)) & 0x100f00f00f00f00f; // after this step, the bits of x are spread out with 8 zeros in between, and we keep only the relevant bits
-    x = (x | (x << 4)) & 0x10c30c30c30c30c3; //
-    x = (x | (x << 2)) & 0x1249249249249249; //
+    x = (x | (x << 32)) & 0x1f00000000ffff;
+    x = (x | (x << 16)) & 0x1f0000ff0000ff;
+    x = (x | (x << 8)) & 0x100f00f00f00f00f;
+    x = (x | (x << 4)) & 0x10c30c30c30c30c3;
+    x = (x | (x << 2)) & 0x1249249249249249;
     x
 }
 
@@ -630,8 +598,7 @@ mod tests {
         assert_eq!(tree.node_com_y[0], 2.0);
         assert_eq!(tree.node_com_z[0], 3.0);
         assert_eq!(tree.node_bodies_count[0], 1);
-        assert_eq!(tree.node_children_count[0], 0); // no children
-        assert_eq!(tree.flat_node_children_start_idx[0], usize::MAX); // sentinel for leaf
+        assert_eq!(tree.node_children[0].len(), 0); // no children
     }
 
     #[test]
@@ -645,7 +612,7 @@ mod tests {
 
         // Find all leaves (nodes with node_children_start_idx == usize::MAX)
         let leaves: Vec<_> = (0..tree.node_count)
-            .filter(|&i| tree.flat_node_children_start_idx[i] == usize::MAX)
+            .filter(|&i| tree.node_children[i].is_empty())
             .collect();
         assert_eq!(leaves.len(), 2, "Should have 2 leaves for 2 bodies");
 
@@ -695,7 +662,7 @@ mod tests {
 
         // Find all leaves
         let leaves: Vec<_> = (0..tree.node_count)
-            .filter(|&i| tree.flat_node_children_start_idx[i] == usize::MAX)
+            .filter(|&i| tree.node_children[i].is_empty())
             .collect();
         assert_eq!(leaves.len(), 3, "Should have 3 leaves for 3 bodies");
 
