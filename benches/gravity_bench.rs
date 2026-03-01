@@ -25,9 +25,9 @@ criterion_group!(
     /*
         Uncomment the benchmark functions below to run them
     */
-    bench_newton_acceleration,
+    // bench_newton_acceleration,
     // bench_newton_parallel_acceleration,
-    // bench_barnes_hut_acceleration,
+    bench_barnes_hut_acceleration,
     // bench_newton_vs_parallel_acceleration,
     // bench_newton_parallel_vs_barnes_hut_acceleration,
     // bench_all_methods_acceleration,
@@ -51,7 +51,7 @@ fn bench_newton_parallel_acceleration(c: &mut Criterion) {
 #[allow(dead_code)]
 fn bench_barnes_hut_acceleration(c: &mut Criterion) {
     let gravity_methods = [BarnesHut];
-    let n_values = [100, 200, 300, 400, 500, 750, 1000, 1500, 2000];
+    let n_values = [1000, 1500, 2000, 2500, 3000, 4000, 5000, 7500, 10000];
     bench_gravity_methods(c, &gravity_methods, &n_values);
 }
 
