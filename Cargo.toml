@@ -13,6 +13,10 @@ serde = { version = "1.0.228", features = ["derive"] }
 criterion = "0.8.2"
 
 [[bench]]
+name = "barnes_hut_bench"
+harness = false
+
+[[bench]]
 name = "gravity_bench"
 harness = false
 
