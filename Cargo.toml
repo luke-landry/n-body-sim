@@ -6,11 +6,15 @@ edition = "2024"
 [dependencies]
 clap = { version = "4.5.53", features = ["derive"] }
 csv = "1.4.0"
+cudarc = { version = "0.19.3", features = ["cuda-12000"] }
 rayon = "1.11.0"
 serde = { version = "1.0.228", features = ["derive"] }
 
 [dev-dependencies]
 criterion = "0.8.2"
+
+[build-dependencies]
+which = "8.0.0"
 
 [[bench]]
 name = "barnes_hut_bench"
