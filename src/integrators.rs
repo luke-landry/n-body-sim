@@ -1,4 +1,4 @@
-use crate::{gravity::Gravity, simulation::Bodies};
+use crate::{body::Bodies, gravity::Gravity};
 
 pub mod euler;
 pub mod runge_kutta;

@@ -1,60 +1,23 @@
-use crate::body::{Bodies, Body};
-use crate::integrators::Integrator;
-use crate::output::SimulationData;
 use std::sync::mpsc::Sender;
-pub struct Parameters {
-    /// Time step size in seconds
-    pub time_step: f64,
 
-    /// Number of time steps to simulate
-    pub num_steps: usize,
+use crate::{
+    gpu::{
+        CudaManager, device_bodies::DeviceBodies, gravity::GpuGravity, integrators::GpuIntegrator,
+    },
+    output::SimulationData,
+    simulation::{Parameters, Simulation},
+};
 
-    /// The gravitational constant to use for gravitational force calculations
-    pub g_constant: f64,
-
-    /// The softening factor used to prevent numerical instability
-    /// when the distance between two bodies approaches zero
-    pub softening_factor: f64,
-
-    /// The theta value used in Barnes-Hut gravity force calculations
-    pub theta: f64,
-
-    /// Whether to output step progress
-    pub progress: bool,
-}
-
-impl Parameters {
-    pub fn new(
-        time_step: f64,
-        num_steps: usize,
-        g_constant: f64,
-        softening_factor: f64,
-        theta: f64,
-        progress: bool,
-    ) -> Self {
-        Parameters {
-            time_step,
-            num_steps,
-            g_constant,
-            softening_factor,
-            theta,
-            progress,
-        }
-    }
-}
-
-pub trait Simulation: Send {
-    fn run(&mut self);
-}
-
-pub struct Simulator {
-    bodies: Vec<Body>,
+pub struct GpuSimulator {
+    gpu: CudaManager,
     parameters: Parameters,
-    integrator: Box<dyn Integrator>,
+    bodies: DeviceBodies,
+    gravity: Box<dyn GpuGravity>,
+    integrator: Box<dyn GpuIntegrator>,
     tx: Option<Sender<SimulationData>>,
 }
 
-impl Simulator {
+impl GpuSimulator {
     // Max size of a batch of simulation data to send in bytes
     const BATCH_SIZE_BYTES: usize = 16000000;
 
@@ -62,31 +25,44 @@ impl Simulator {
     const BATCH_SIZE: usize = Self::BATCH_SIZE_BYTES / SimulationData::RECORD_SIZE_BYTES;
 
     pub fn new(
-        bodies: Vec<Body>,
+        gpu: CudaManager,
         parameters: Parameters,
-        integrator: Box<dyn Integrator>,
+        bodies: DeviceBodies,
+        gravity: Box<dyn GpuGravity>,
+        integrator: Box<dyn GpuIntegrator>,
         tx: Option<Sender<SimulationData>>,
     ) -> Self {
-        Simulator {
-            bodies,
+        Self {
+            gpu,
             parameters,
+            bodies,
+            gravity,
             integrator,
             tx,
         }
     }
 }
 
-impl Simulation for Simulator {
+impl Simulation for GpuSimulator {
     fn run(&mut self) {
-        let mut bodies = Bodies::from(self.bodies.as_slice());
-        let mut buffer = SimulationData::with_capacity(Self::BATCH_SIZE); // TODO optimize batch size
+        let mut buffer = SimulationData::with_capacity(Self::BATCH_SIZE);
         let one_percent_steps = (self.parameters.num_steps / 100).max(1);
         let mut time = 0.0;
 
         // main simulation loop
         for step in 0..self.parameters.num_steps {
             if let Some(tx) = &self.tx {
-                // record current time step simulation data in the buffer
+                self.gpu
+                    .stream
+                    .synchronize()
+                    .expect("Failed to synchronize GPU");
+
+                // download body data from GPU to CPU for output
+                let bodies = self
+                    .bodies
+                    .download(&self.gpu)
+                    .expect("Failed to download bodies from GPU");
+
                 buffer.extend_from_step(time, &bodies.pos_x, &bodies.pos_y, &bodies.pos_z);
 
                 if buffer.len() >= Self::BATCH_SIZE {
@@ -106,13 +82,27 @@ impl Simulation for Simulator {
                 }
             }
 
-            self.integrator.step(&mut bodies);
+            self.integrator
+                .step(&self.gpu, &mut self.bodies, &*self.gravity)
+                .expect("Failed to perform simulation step on GPU");
+
             time += self.parameters.time_step;
 
             if self.parameters.progress && step % one_percent_steps == 0 {
                 println!("{}", (step * 100) / self.parameters.num_steps);
             }
         }
+
+        self.gpu
+            .stream
+            .synchronize()
+            .expect("Failed to synchronize GPU");
+
+        // download body data from GPU to CPU for output
+        let bodies = self
+            .bodies
+            .download(&self.gpu)
+            .expect("Failed to download bodies from GPU");
 
         // record final state and send remaining data
         buffer.extend_from_step(time, &bodies.pos_x, &bodies.pos_y, &bodies.pos_z);

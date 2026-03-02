@@ -1,7 +1,7 @@
 use crate::{
+    body::Bodies,
     gravity::Gravity,
     integrators::{Accelerations, Integrator, compute_acceleration},
-    simulation::Bodies,
 };
 
 pub struct RungeKuttaIntegrator {

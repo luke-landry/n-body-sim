@@ -8,7 +8,8 @@ use n_body_sim::args::{
     IntegratorMethod,
     IntegratorMethod::{Euler, RungeKutta, VelocityVerlet},
 };
-use n_body_sim::simulation::{Bodies, Parameters};
+use n_body_sim::body::Bodies;
+use n_body_sim::simulation::Parameters;
 
 /*
   Criterion benchmarks for n-body simulation integrators

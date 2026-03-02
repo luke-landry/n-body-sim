@@ -1,4 +1,4 @@
-use crate::simulation::Body;
+use crate::body::Body;
 
 use csv::Reader;
 use serde::Deserialize;
