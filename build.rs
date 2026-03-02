@@ -5,7 +5,7 @@ use std::process::Command;
 
 fn main() {
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let cuda_src = root.join("cuda/acceleration.cu");
+    let cuda_src = root.join("cuda/kernels.cu");
     if !cuda_src.exists() {
         panic!("CUDA source file not found at {}", cuda_src.display());
     }
@@ -13,7 +13,7 @@ fn main() {
     println!("cargo:rerun-if-changed={}", cuda_src.display());
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-    let ptx_out = out_dir.join("acceleration.ptx");
+    let ptx_out = out_dir.join("kernels.ptx");
 
     compile_cuda(cuda_src, ptx_out);
 }

@@ -1,5 +1,5 @@
+use crate::body::Bodies;
 use crate::integrators::{Accelerations, compute_acceleration};
-use crate::simulation::Bodies;
 use crate::{gravity::Gravity, integrators::Integrator};
 
 pub struct EulerIntegrator {

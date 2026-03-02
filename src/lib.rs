@@ -1,4 +1,5 @@
 pub mod args;
+pub mod body;
 pub mod constants;
 pub mod gpu;
 pub mod gravity;
