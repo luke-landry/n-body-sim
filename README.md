@@ -9,24 +9,32 @@ This project implements an N-body simulator that models the gravitational intera
 ### Sections
 - [Quick Start](#quick-start)
 - [GUI Usage](#gui-usage)
+  - [Launcher](#launcher)
+  - [Visualizer](#visualizer)
 - [CLI Usage](#cli-usage)
 - [Data Formats](#data-formats)
+  - [Initial Conditions](#initial-conditions)
+  - [Output Data](#output-data)
 - [Build](#build)
 - [Theory](#theory)
+    - [Integrators](#integrators)
+    - [Gravity](#gravity)
 - [Benchmarks](#benchmarks)
+    - [Integrators](#integrators)
+    - [Gravity](#gravity)
+    - [GPU Acceleration](#gpu-acceleration)
 - [Design](#design)
 
 ## Quick Start
 ### Prerequisites
 - Python 3.11+ installed
+- (optional) NVIDIA GPU with CUDA 12.0+ support (already included in modern drivers) to use GPU acceleration
 
 ### Windows Setup
-1. Download and extract the latest Windows release zip, or clone the repository
-2. Run `install.bat` to setup the Python virtual environment and install required packages (first time only)
-3. Run `run.bat` to start the application
+TBD
 
 ### Linux Setup
-1. Download and extract the latest Linux release tarball, or clone the repository
+1. Clone the repository and follow the [Build](#build) instructions (prebuilt release TBD)
 2. Run `install.sh` to setup the Python virtual environment and install required packages (first time only)
     - On Debian/Ubuntu, you may need to install `python3-venv` with `sudo apt install python3-venv` before running this install script
 3. Run `run.sh` to start the application
@@ -115,6 +123,7 @@ The Rust physics engine executable can also be run independently without install
 - `--theta`: The theta value is used in the Barnes-Hut gravity calculation method to determine when to approximate a group of distant bodies as a single combined mass. A smaller theta value results in a more accurate simulation but increases computation time, while a larger theta value reduces accuracy but improves performance. Default: `0.5`
 - `--gravity`: The method to use for calculating gravitational forces between bodies. The options are `newton`, `newton-parallel`, and `barnes-hut`. Default: `newton`
 - `--integrator`: The numerical integration method to use for updating the positions and velocities of the bodies at each time step. The options are `euler`, `velocity-verlet`, and `runge-kutta`. Default: `euler`
+- `--gpu`: Enable GPU acceleration for the simulation using CUDA. This can significantly improve performance for large simulations, but requires an NVIDIA GPU with CUDA support. Currently only supports the `newton-parallel` gravity method and `euler` integrator. Default: disabled
 - `-h --help`: Displays the help message with all available command line options
 
 ### Examples
@@ -210,22 +219,30 @@ The file extension for binary output data files is `.nbody` and the file begins 
 
 
 ### Targets
-  - Linux: `cargo build`
-  - Windows: `cargo build --target x86_64-pc-windows-gnu`
+  - Linux: `cargo build --release`
+  - Windows: `cargo build --release --target x86_64-pc-windows-gnu`
+
+### Install
+The Rust executable will be built to `target/release/n-body-sim` for Linux target and `target/x86_64-pc-windows-gnu/release/n-body-sim.exe` for Windows target. The Python GUI expects the Rust executable to be located at `bin/n-body-sim` for Linux and `bin\n-body-sim.exe` for Windows, so copy the built executable to those paths after building.
+```bash
+cp target/release/n-body-sim bin/n-body-sim # Linux
+```
+```powershell
+cp target\x86_64-pc-windows-gnu\release\n-body-sim.exe bin\n-body-sim.exe # Windows
+```
+
+Make sure to exit the container to run the Python GUI, as the container is only meant for building the Rust executable, and the Python GUI is run on the host machine.
+
 
 ## Theory
 
-### Physics
 The **N-body problem** involves predicting the individual motions of a group of objects interacting through gravitational force.
 - **2-Body problem**: Systems with two objects (e.g., a planet and a moon) have a "closed-form" solution. A single mathematical formula can calculate their exact positions at any point in the future.
 - **3-Body problem**: When a third object is added, the system becomes complex. Because the gravitational force on each object depends on the positions of all other objects, their motions are described by coupled differential equations. There is no general closed-form formula to solve these equations exactly. Instead, the system must be solved numerically by calculating the state of the system in small, successive time increments.
 
 For 3+ bodies, the system generally becomes chaotic, which means it is highly sensitive to initial conditions. Two systems starting with a difference even as small as one millimeter in position could eventually diverge into completely different configurations.
 
-
-### Numerical Methods & Algorithms
-
-#### **Integrators**
+### **Integrators**
 Integrators are algorithms that update the position and velocity of each body at every time step.
 - **Semi-implicit Euler**: A first-order symplectic integrator modified from the non-symplectic standard Euler method. It is simple and efficient but not the most accurate.
 - **Velocity Verlet**: A second-order symplectic integrator that provides improved accuracy by evaluating accelerations at the beginning and end of each time step and using both to update positions and velocities.
@@ -234,7 +251,7 @@ Integrators are algorithms that update the position and velocity of each body at
 
 In non-symplectic integrators, such as the standard Euler or Runge-Kutta methods, numerical rounding errors accumulate, causing the system to gain or lose energy over time (e.g., planets spiraling into the sun). Symplectic integrators keep these energy errors bounded, ensuring that orbits remain stable over long simulation periods. Symplectic integrators are generally more accurate for long-term simulations while non-symplectic higher-order integrators may be preferred for short-term accuracy.
 
-#### **Gravity**
+### **Gravity**
 These algorithms calculate the gravitational forces exerted on each body.
 - **Newton**: Calculates the force between every pair of bodies directly. This is perfectly accurate but slow for large systems, with a time complexity of $O(n^2)$.
 - **Newton Parallel**: A multi-threaded version of the Newton method that calculates the forces on all bodies in parallel, improving performance for large systems compared to the single-threaded Newton method, but still has a time complexity of $O(n^2)$.
@@ -266,18 +283,17 @@ This project uses the criterion crate for benchmarking the physics engine. The b
 
 **Note:** criterion tries to use `gnuplot` by default to generate graphs for the benchmark reports, so you may want to install it on your system. Otherwise, it uses the `plotters` crate to generate graphs.
 
-### Performance Comparisons
-The following benchmarks were done on a mini-PC with an Intel Core i5-12450H (8C/12T, up to 4.4GHz) CPU and 32GB of DDR4 3200MHz RAM running Ubuntu Server 24.04.
+The following benchmarks for integrators and gravity methods were done on a mini-PC with an Intel Core i5-12450H (8C/12T, up to 4.4GHz) CPU and 32GB of DDR4 3200MHz RAM running Ubuntu Server 24.04.
 
 
-#### Integrators
+### Integrators
 This benchmark compares the three integrators: Euler, Velocity-Verlet, and Runge-Kutta using the same gravity method (Newton) across different numbers of bodies. The x-axis represents the number of bodies, and the y axis is time to compute a single step of the simulation.
 
 ![benchmark-e-vs-vv-vs-rk-u-n](images/benchmark-e-vs-vv-vs-rk-u-n.svg)
 
 This shows that the Euler integrator is the fastest, followed by Velocity-Verlet which is approximately 2x slower than Euler, and then Runge-Kutta which is approximately 4x slower than Euler. This is because Euler, Velocity Verlet, and Runge-Kutta perform 1, 2, and 4, acceleration calculations per step, respectively. So, given the same same gravity methods, the time difference between the integrators is a relatively consistent factor of 1x, 2x, or 4x for Euler, Velocity-Verlet, or Runge-Kutta, as the acceleration calculations dominate the overall computation time. The Euler method while being fast is the least accurate of the three, while the relatively slow Runge-Kutta is the most accurate, so there is a tradeoff between performance and accuracy when choosing an integrator.
 
-#### Gravity
+### Gravity
 These benchmarks compare the three gravity calculation methods: Newton, Newton Parallel, and Barnes-Hut across different numbers of bodies. The x-axis represents the number of bodies, and the y axis is time to compute a single set of accelerations for all bodies. For the Barnes-Hut method, an approximation threshold of $\theta=0.5$ was used.
 
 ![benchmark-n-vs-np-vs-bh](images/benchmark-n-vs-np-vs-bh.svg)
@@ -293,10 +309,10 @@ This next benchmark compares the Barnes-Hut method with different values of the 
 
 At $\theta=0.0$, the Barnes-Hut method never approximates distant bodies, so it has the same accuracy and time complexity of $O(n^2)$ as the Newton methods. At $\theta=0.1$, there is already a large performance improvement, and as $\theta$ increases, the performance continues to improve but with diminishing returns. Increasing $\theta$ decreases the time it takes to compute the accelerations, but also decreases the accuracy of the simulation results.
 
-#### GPU Acceleration
+### GPU Acceleration
 The following benchmarks compare the GPU-accelerated versions of the implemented GPU-accelerated gravity and integrator methods to their CPU counterparts across different numbers of bodies. The GPU-accelerated methods are implemented using CUDA and run on NVIDIA GPUs.
 
-An important consideration with GPU acceleration is that this project uses FP64 (double precision) floating point numbers for the physics calculations to maintain higher accuracy during the simulation. In general, GPUs have much higher performance for FP32 (single precision) calculations compared to FP64. Also, most consumer-grade GPUs are optimized specifically for FP32 performance, so the difference in performance between FP32 and FP64 even lower than the 1:2 ratio that would be expected based on the number of calculations alone. To get a direct 1:2 ratio, server-grade GPUs with better FP64 hardware support need to be used to make use of the full potential of GPU acceleration. 
+An important consideration with GPU acceleration is that this project uses FP64 (double precision) floating point numbers for the physics calculations to maintain higher accuracy during the simulation. In general, GPUs have much higher performance for FP32 (single precision) calculations compared to FP64. Also, most consumer-grade GPUs are optimized specifically for FP32 performance, so the difference in performance between FP32 and FP64 is even lower than the 1:2 ratio that would be expected based on the number of calculations alone. To get a direct 1:2 ratio, server-grade GPUs with better FP64 hardware support need to be used to make use of the full potential of GPU acceleration. 
 
 For example:
 - **NVIDIA A100 (server-grade GPU)**: Theoretical FP32 performance is 19.49 TFLOPS, and theoretical FP64 performance is 9.746 TFLOPS, which is approximately a 1:2 ratio ([source](https://www.techpowerup.com/gpu-specs/a100-pcie-40-gb.c3623)).
