@@ -44,7 +44,9 @@ criterion_main!(benches);
 fn bench_euler_step(c: &mut Criterion) {
     let integrator_methods = [Euler];
     let gravity_methods = [NewtonParallel];
-    let n_values = [1000, 2000, 3000, 4000, 5000, 7500, 10000, 15000, 20000];
+    let n_values = [
+        1000, 2000, 3000, 4000, 5000, 7500, 10000, 15000, 20000, 25000,
+    ];
     bench_integrator_methods(c, &integrator_methods, &gravity_methods, &n_values);
 }
 
