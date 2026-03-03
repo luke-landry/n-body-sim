@@ -288,9 +288,24 @@ These show that the single-threaded Newton method is the fastest for $n\lt 100$,
 
 This next benchmark compares the Barnes-Hut method with different values of the approximation threshold $\theta$. The x-axis represents the number of bodies, and the y axis is time to compute a single set of accelerations for all bodies.
 
+
 ![benchmark-bh-theta](images/benchmark-bh-theta.svg)
 
 At $\theta=0.0$, the Barnes-Hut method never approximates distant bodies, so it has the same accuracy and time complexity of $O(n^2)$ as the Newton methods. At $\theta=0.1$, there is already a large performance improvement, and as $\theta$ increases, the performance continues to improve but with diminishing returns. Increasing $\theta$ decreases the time it takes to compute the accelerations, but also decreases the accuracy of the simulation results.
+
+#### GPU Acceleration
+The following benchmarks compare the GPU-accelerated versions of the implemented GPU-accelerated gravity and integrator methods to their CPU counterparts across different numbers of bodies. The GPU-accelerated methods are implemented using CUDA and run on NVIDIA GPUs.
+
+An important consideration with GPU acceleration is that this project uses FP64 (double precision) floating point numbers for the physics calculations to maintain higher numerical accuracy in the simulation results. In general, GPUs have much higher performance for FP32 (single precision) calculations compared to FP64. Furthermore, most consumer-grade GPUs are optimized specifically for FP32 performance, so the difference in performance between FP32 and FP64 is much lower than the 1:2 ratio that would be expected based on the number of calculations alone. To get the direct 1:2 ratio, server-grade GPUs with better FP64 hardware support need to be used to make use of the full potential of GPU acceleration. 
+
+For example:
+- **NVIDIA A100 (server-grade GPU)**: Theoretical FP32 performance is 19.49 TFLOPS, and theoretical FP64 performance is 9.746 TFLOPS, which is approximately a 1:2 ratio.
+- **NVIDIA RTX 5090 (consumer-grade GPU)**: Theoretical FP32 performance is 104.8 TFLOPS, but theoretical FP64 performance is only 1.637 TFLOPS, which is approximately a 1:64 ratio.
+
+This benchmark was run on a cloud instance with an NVIDIA A100 PCIe 40GB GPU, with an AMD EPYC 7B13 (128C/256T, up to 3.5GHz) CPU and 512GB of RAM running Ubuntu Server 24.04 with CUDA 12.8.
+![benchmark-gpu-a100-np](images/benchmark-gpu-a100-np.svg)
+
+The GPU-accelerated Euler/Newton Parallel method has a much higher initial overhead than the CPU version, so it is only faster after approximately $n\geq 2000$. However, for those larger numbers of bodies, the GPU-accelerated version is significantly faster than the CPU version, with the performance gap increasing as n increases. While the time complexity is still $O(n^2)$ for both versions, the GPU-accelerated version has a much lower constant factor due to the massive parallelism of the GPU, and at this scale the GPU's performance looks nearly $O(n)$ (linear).
 
 ## Design
 The project is organized into two main components: the Rust physics engine and the Python GUI tools. The physics engine is responsible for performing the N-body simulation, while the GUI tools provide an interface for configuring simulations and viewing results.

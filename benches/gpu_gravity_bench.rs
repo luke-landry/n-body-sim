@@ -43,7 +43,7 @@ criterion_main!(benches);
 #[allow(dead_code)]
 fn bench_gpu_newton_parallel_acceleration(c: &mut Criterion) {
     let gravity_methods = [NewtonParallel];
-    let n_values = [2, 5, 10, 25, 50, 75, 100, 150, 200];
+    let n_values = [1000, 2000, 3000, 4000, 5000, 7500, 10000, 15000, 20000];
     bench_gravity_methods(c, &gravity_methods, &n_values);
 }
 
