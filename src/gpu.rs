@@ -5,26 +5,23 @@ pub mod simulation;
 
 use std::error::Error;
 use std::sync::Arc;
-use std::sync::LazyLock;
 
 use cudarc::driver::{CudaContext, CudaFunction, CudaStream, LaunchConfig};
 
+// PTX instructions compiled by nvcc at build time are embedded
+// here to be loaded as a module into the GPU at runtime
 const PTX_DATA: &str = include_str!(env!("PTX_OUT"));
 
-pub static GPU: LazyLock<CudaManager> =
-    LazyLock::new(|| CudaManager::new().expect("Failed to initialize CUDA"));
-
 pub struct CudaManager {
-    stream: Arc<CudaStream>,
+    pub stream: Arc<CudaStream>,
 
-    cuda_fn_gpu_init_check: CudaFunction,
-    cuda_fn_newton_compute_accelerations: CudaFunction,
-    cuda_fn_euler_step: CudaFunction,
+    pub cuda_fn_gpu_init_check: CudaFunction,
+    pub cuda_fn_newton_compute_accelerations: CudaFunction,
+    pub cuda_fn_euler_step: CudaFunction,
 }
 
 impl CudaManager {
     pub fn new() -> Result<Self, Box<dyn Error>> {
-        println!("PTX content:\n{}", PTX_DATA);
         let ctx = CudaContext::new(0)?;
         let stream = ctx.default_stream();
         let module = ctx.load_module(PTX_DATA.into())?;

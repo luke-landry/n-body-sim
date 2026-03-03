@@ -43,6 +43,6 @@ fn compile_cuda(cuda_src: PathBuf, ptx_out: PathBuf) {
     }
 
     // set env variable with the ptx output path to the generated
-    // ptx file so rustc can find it during compilation
+    // ptx file so that rustc can find it during compilation
     println!("cargo:rustc-env=PTX_OUT={}", ptx_out.display());
 }
