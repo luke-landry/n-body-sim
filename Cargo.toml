@@ -27,3 +27,11 @@ harness = false
 [[bench]]
 name = "integrator_bench"
 harness = false
+
+[[bench]]
+name = "gpu_gravity_bench"
+harness = false
+
+[[bench]]
+name = "gpu_integrator_bench"
+harness = false
