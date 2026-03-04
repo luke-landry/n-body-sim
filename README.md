@@ -31,12 +31,12 @@ This project implements an N-body simulator that models the gravitational intera
 - (optional) NVIDIA GPU with CUDA 12.0+ support (already included in modern drivers) to use GPU acceleration
 
 ### Windows Setup
-1. Download the latest release for Windows from the releases page and extract the zip file
+1. Download the latest release for Windows from the [releases page](https://github.com/luke-landry/n-body-sim/releases) and extract the zip file
 2. Run `install.bat` to setup the Python virtual environment and install required packages (first time only)
 3. Run `run.bat` to start the application
 
 ### Linux Setup
-1. Download the latest release for Linux from the releases page and extract the tar.gz file
+1. Download the latest release for Linux from the [releases page](https://github.com/luke-landry/n-body-sim/releases) and extract the tar.gz file
 2. Run `install.sh` to setup the Python virtual environment and install required packages (first time only)
     - On Debian/Ubuntu, you may need to install `python3-venv` with `sudo apt install python3-venv` before running this install script
 3. Run `run.sh` to start the application
