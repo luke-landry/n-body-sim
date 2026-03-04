@@ -7,3 +7,4 @@ gui/__pycache__/
 n-body-sim*
 *.old
 .zed/
+dist/

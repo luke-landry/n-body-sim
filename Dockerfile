@@ -2,10 +2,13 @@ FROM rust:trixie
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# enable debian non-free repositories for nvidia-cuda-toolkit
+RUN sed -i 's/main/main contrib non-free/g' /etc/apt/sources.list.d/debian.sources
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     # apt packages needed for development
-    git sudo mingw-w64 gnuplot nvidia-cuda-toolkit \
+    git sudo mingw-w64 gnuplot nvidia-cuda-toolkit zip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

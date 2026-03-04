@@ -59,7 +59,7 @@ impl NBodySim {
         tx: Option<Sender<SimulationData>>,
     ) -> Box<dyn Simulation> {
         if args.gpu {
-            let gpu = CudaManager::new().expect("Failed to initialize CUDA");
+            let gpu = CudaManager::new().expect("Failed to initialize GPU for simulation");
             gpu.gpu_init_check()
                 .expect("GPU initialization check failed");
             let device_bodies = DeviceBodies::new(&gpu, &bodies.as_slice().into())

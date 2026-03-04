@@ -17,8 +17,8 @@ fi
 
 # Setup virtual environment
 if [ ! -f "$PYTHON_VENV" ]; then
-    echo "[INFO] Creating virtual environment..."
-    "$PYTHON" -m venv "$VENV_DIR" || { echo "[ERROR] Failed to create virtual environment."; exit 1; }
+    echo "[INFO] Creating Python virtual environment..."
+    "$PYTHON" -m venv "$VENV_DIR" || { echo "[ERROR] Failed to create Python virtual environment."; exit 1; }
 fi
 
 # Check requirements
@@ -41,4 +41,7 @@ echo "[INFO] Upgrading pip in virtual environment..."
 echo "[INFO] Installing packages..."
 "$PYTHON_VENV" -m pip install -r "$REQ_FILE" || { echo "[ERROR] Failed to install packages."; exit 1; }
 
-echo "[SUCCESS] Installation complete."
+echo "[SUCCESS] Installation complete. Use run.sh to start the application."
+if [ -t 0 ]; then
+    read -rp "Press Enter to close..."
+fi

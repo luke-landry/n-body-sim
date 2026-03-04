@@ -8,7 +8,7 @@ set "SCRIPT=gui\main.py"
 
 :: Check if virtual environment exists
 if not exist "%PYTHON_VENV%" (
-    echo [ERROR] Virtual environment not found. Please run install.bat first.
+    echo [ERROR] Python virtual environment not found. Please run install.bat first.
     pause
     exit /b 1
 )

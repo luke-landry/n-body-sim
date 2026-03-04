@@ -21,10 +21,10 @@ if errorlevel 1 (
 
 :: Setup venv
 if not exist "%PYTHON_VENV%" (
-    echo [INFO] Creating virtual environment...
+    echo [INFO] Creating Python virtual environment...
     "%PYTHON%" -m venv "%VENV_DIR%"
     if errorlevel 1 (
-        echo [ERROR] Failed to create virtual environment.
+        echo [ERROR] Failed to create Python virtual environment.
         pause
         exit /b 1
     )
@@ -67,4 +67,6 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [SUCCESS] Installation complete.
+echo [SUCCESS] Installation complete. Use run.bat to start the application.
+pause
+exit /b 0

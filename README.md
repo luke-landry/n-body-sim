@@ -31,10 +31,12 @@ This project implements an N-body simulator that models the gravitational intera
 - (optional) NVIDIA GPU with CUDA 12.0+ support (already included in modern drivers) to use GPU acceleration
 
 ### Windows Setup
-TBD
+1. Download the latest release for Windows from the releases page and extract the zip file
+2. Run `install.bat` to setup the Python virtual environment and install required packages (first time only)
+3. Run `run.bat` to start the application
 
 ### Linux Setup
-1. Clone the repository and follow the [Build](#build) instructions (prebuilt release TBD)
+1. Download the latest release for Linux from the releases page and extract the tar.gz file
 2. Run `install.sh` to setup the Python virtual environment and install required packages (first time only)
     - On Debian/Ubuntu, you may need to install `python3-venv` with `sudo apt install python3-venv` before running this install script
 3. Run `run.sh` to start the application
@@ -212,10 +214,11 @@ The file extension for binary output data files is `.nbody` and the file begins 
 
 #### **Manually with Docker installed**
 1. Build the development image with `docker build -t n-body-sim .`
-2. Run the development container with 
+2. If an existing n-body-sim container is running, stop it with `docker rm -f n-body-sim`
+3. Run the development container with 
     - Linux (bash): `docker run -dit -v $(pwd):/home/dev/n-body-sim --name n-body-sim n-body-sim`
     - Windows (PS): `docker run -dit -v ${PWD}:/home/dev/n-body-sim --name n-body-sim n-body-sim`
-3. Enter the container with `docker exec -it n-body-sim bash`
+4. Enter the container with `docker exec -it n-body-sim bash`
 
 
 ### Targets
