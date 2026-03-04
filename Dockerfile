@@ -28,3 +28,5 @@ USER $USERNAME
 
 RUN rustup target add x86_64-pc-windows-gnu \
     && rustup component add clippy rustfmt
+
+RUN cargo install cargo-about

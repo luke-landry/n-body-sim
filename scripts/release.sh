@@ -11,15 +11,25 @@ require_cmd() {
     fi
 }
 
+require_cargo_about() {
+    if ! cargo about --version >/dev/null 2>&1; then
+        echo "[ERROR] Missing cargo-about subcommand (cargo about)"
+        exit 1
+    fi
+}
+
 echo "[INFO] Checking required tools..."
 require_cmd cargo
 require_cmd tar
 require_cmd zip
 require_cmd sha256sum
+require_cargo_about
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
 WINDOWS_TARGET="x86_64-pc-windows-gnu"
+ABOUT_TEMPLATE="$ROOT_DIR/about.hbs"
+THIRD_PARTY_LICENSES_FILE="$ROOT_DIR/THIRD_PARTY_LICENSES.html"
 
 RELEASE_VERSION="$(cargo pkgid | sed 's/.*#//')"
 
@@ -31,6 +41,17 @@ if [[ -z "$RELEASE_VERSION" ]]; then
 fi
 
 RELEASE_TAG="v$RELEASE_VERSION"
+
+if [[ ! -f "$ABOUT_TEMPLATE" ]]; then
+    echo "[ERROR] Missing cargo-about template: $ABOUT_TEMPLATE"
+    exit 1
+fi
+
+echo "[INFO] Generating third-party licenses..."
+(
+    cd "$ROOT_DIR"
+    cargo about generate "$ABOUT_TEMPLATE" > "$THIRD_PARTY_LICENSES_FILE"
+)
 
 LINUX_NAME="n-body-sim-${RELEASE_TAG}-linux-x86_64"
 WINDOWS_NAME="n-body-sim-${RELEASE_TAG}-windows-x86_64"
@@ -45,6 +66,8 @@ CHECKSUMS_FILE="$DIST_DIR/SHA256SUMS"
 copy_common_assets() {
     local destination="$1"
 
+    cp "$ROOT_DIR/LICENSE" "$destination/LICENSE"
+    cp "$THIRD_PARTY_LICENSES_FILE" "$destination/THIRD_PARTY_LICENSES.html"
     sed "s/{{VERSION}}/$RELEASE_TAG/g" "$ROOT_DIR/README_release_template.txt" > "$destination/README.txt"
     cp "$ROOT_DIR/requirements.txt" "$destination/requirements.txt"
 
