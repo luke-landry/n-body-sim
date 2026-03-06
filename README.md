@@ -24,6 +24,7 @@ This project implements an N-body simulator that models the gravitational intera
     - [Gravity](#gravity)
     - [GPU Acceleration](#gpu-acceleration)
 - [Design](#design)
+- [License](#license)
 
 ## Quick Start
 ### Prerequisites
@@ -54,6 +55,9 @@ This project implements an N-body simulator that models the gravitational intera
 2. Under the "Generate Scenario" section, select a generator type (e.g. "Star System"), number of bodies `n` (e.g. 100), and radius `r` (e.g. 10.0), then click "Generate Scenario" to create a random initial conditions configuration
 3. Click "Launch and View Simulation" to run the simulation and see the results.  
 **Note:** disable the "Enable Trails" option in the visualization configuration for better performance when viewing 100+ bodies, as rendering trails for many bodies can cause lag during playback.
+
+> [!WARNING]
+> Simulations with large numbers of bodies (e.g. 1000+) can create very large output files (multiple GBs). These files are saved by default to `data/run/run_<timestamp>`, so make sure to have enough disk space and to clean up old runs if needed.
 
 See the [GUI Usage](#gui-usage) and [CLI Usage](#cli-usage) sections below for more details on how to use the application.
 
@@ -117,7 +121,7 @@ The Rust physics engine executable can also be run independently without install
 
 **General Usage**
 - `-i, --initial-conditions-path`: Path to a CSV file containing the initial conditions for each body in the simulation. Each row should represent a body with its mass, initial position, and initial velocity. Default: `initial_conditions.csv`
-- `-o, --output-data-path`: Path to a csv or nbody file where the simulation output data will be saved. Default: `output.csv`
+- `-o, --output-data-path`: Path to a csv or nbody file where the simulation output data will be saved. Default: `output.nbody`
 - `-g, --g-constant`: The gravitational constant to use in the gravitational force calculations. This is a scaling factor that affects the strength of the gravitational interactions between bodies. Default: `1.0`
 - `-t, --time-step`: The time step in seconds for the simulation. This determines how frequently the positions and velocities of the bodies are updated. A smaller time step can lead to more accurate results but will increase the computation time. Default: `0.01`
 - `-n, --num-steps`: The total number of time steps to simulate. This determines the overall duration of the simulation. For example, with a time step of 0.01 seconds and 10000 steps, the simulation will cover a total of 100 seconds of simulated time. Default: `10000`
@@ -236,6 +240,9 @@ cp target\x86_64-pc-windows-gnu\release\n-body-sim.exe bin\n-body-sim.exe # Wind
 
 Make sure to exit the container to run the Python GUI, as the container is only meant for building the Rust executable, and the Python GUI is run on the host machine.
 
+### Release
+Release build archives can be created using the `scripts/release.sh` script, which builds the Rust executable for both Linux and Windows targets and copies them along with other necessary files to the `dist` directory, then creates zip and tar.gz archives for each target in the `dist` directory.
+
 
 ## Theory
 
@@ -283,6 +290,8 @@ A larger $\epsilon$ increases numerical stability by smoothing out interactions,
 
 ## Benchmarks
 This project uses the criterion crate for benchmarking the physics engine. The benchmarks can be run using `cargo bench` and the results will be saved to the `target/criterion` directory as HTML reports which include automatically-generated graphs. To benchmark the gravity methods only, use `cargo bench --bench gravity_bench`, and to benchmark the integrators only, use `cargo bench --bench integrator_bench`. To configure the gravity methods, integrator methods, and n-values used in the benchmarks, edit the `gravity_bench.rs` and `integrator_bench.rs` files in the `benches` directory.
+
+The benchmarks for GPU accelerated gravity and integrator methods are implemented in the `gpu_gravity_bench.rs` and `gpu_integrator_bench.rs` files. To run these benchmarks specifically, use `cargo bench --bench gpu_gravity_bench` and `cargo bench --bench gpu_integrator_bench`.
 
 **Note:** criterion tries to use `gnuplot` by default to generate graphs for the benchmark reports, so you may want to install it on your system. Otherwise, it uses the `plotters` crate to generate graphs.
 
@@ -341,6 +350,8 @@ The source code of the Rust physics engine is in the `src` directory and contain
 The initial conditions are read into a vector of structs `bodies: Vec<Body>`, each containing the mass, position, and velocity of a body. This format is known as "array of structs" (AoS) which is intuitive and easy to work with for reading and writing file data. However, it is not the most efficient data format for computation, as the pointer-chasing required to access the fields of each body struct can lead to slower performance. It is also not an ideal format for performing vectorized operations for one field on all bodies at once during the simulation calculations, which is able to be accelerated with SIMD instructions.
 
 A more efficient format for computation is "struct of arrays" (SoA), where the body properties (mass, position, velocity) are stored in a struct `bodies: Bodies` containing equal-length arrays where each element corresponds to a body (e.g. for accessing the mass of the 5th body, it would be `bodies[5].mass` for AoS, and `bodies.masses[5]` in SoA). This allows for better cache locality because similar data is stored contiguously in memory, improving performance during the simulation calculations which often require operations on the properties of all bodies at once, such as updating the positions or velocities of all bodies in a step.
+
+GPU acceleration was implemented by running the parallelizable parts of the simulation calculations on the GPU using CUDA. The body data is initially transferred to the GPU in SoA format for efficient computation, and the CPU passes pointers to the GPU memory where the body properties are stored each step, so that the GPU can directly read and write to those memory locations during the simulation calculations without needing to transfer large amounts of data back and forth between the CPU and GPU in between steps. To interact with GPU from Rust, the CUDA kernels are compiled to PTX intermediate representation at build time, and this PTX is included in the final executable. The 'cudarc' crate is used to call the CUDA driver API to load the PTX at runtime and then call the CUDA kernel functions.
 
 The simulation initial conditions are read from the CSV file into an AoS format, and then converted to an SoA format for the simulation calculations.
 
