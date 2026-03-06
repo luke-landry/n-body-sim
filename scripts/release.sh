@@ -28,8 +28,10 @@ require_cargo_about
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
 WINDOWS_TARGET="x86_64-pc-windows-gnu"
-ABOUT_TEMPLATE="$ROOT_DIR/about.hbs"
-THIRD_PARTY_LICENSES_FILE="$ROOT_DIR/THIRD_PARTY_LICENSES.html"
+ABOUT_TEMPLATE="$ROOT_DIR/release/about.hbs"
+ABOUT_CONFIG="$ROOT_DIR/release/about.toml"
+THIRD_PARTY_LICENSES_FILE="$ROOT_DIR/release/THIRD_PARTY_LICENSES.html"
+README_TEMPLATE="$ROOT_DIR/release/README_release_template.txt"
 
 RELEASE_VERSION="$(cargo pkgid | sed 's/.*#//')"
 
@@ -47,10 +49,20 @@ if [[ ! -f "$ABOUT_TEMPLATE" ]]; then
     exit 1
 fi
 
+if [[ ! -f "$ABOUT_CONFIG" ]]; then
+    echo "[ERROR] Missing cargo-about config: $ABOUT_CONFIG"
+    exit 1
+fi
+
+if [[ ! -f "$README_TEMPLATE" ]]; then
+    echo "[ERROR] Missing release README template: $README_TEMPLATE"
+    exit 1
+fi
+
 echo "[INFO] Generating third-party licenses..."
 (
     cd "$ROOT_DIR"
-    cargo about generate "$ABOUT_TEMPLATE" > "$THIRD_PARTY_LICENSES_FILE"
+    cargo about generate --config "$ABOUT_CONFIG" "$ABOUT_TEMPLATE" > "$THIRD_PARTY_LICENSES_FILE"
 )
 
 LINUX_NAME="n-body-sim-${RELEASE_TAG}-linux-x86_64"
@@ -68,7 +80,7 @@ copy_common_assets() {
 
     cp "$ROOT_DIR/LICENSE" "$destination/LICENSE"
     cp "$THIRD_PARTY_LICENSES_FILE" "$destination/THIRD_PARTY_LICENSES.html"
-    sed "s/{{VERSION}}/$RELEASE_TAG/g" "$ROOT_DIR/README_release_template.txt" > "$destination/README.txt"
+    sed "s/{{VERSION}}/$RELEASE_TAG/g" "$README_TEMPLATE" > "$destination/README.txt"
     cp "$ROOT_DIR/requirements.txt" "$destination/requirements.txt"
 
     cp -a "$ROOT_DIR/gui" "$destination/gui"
@@ -105,10 +117,10 @@ mkdir -p "$LINUX_STAGE/data" "$WINDOWS_STAGE/data"
 copy_common_assets "$LINUX_STAGE"
 copy_common_assets "$WINDOWS_STAGE"
 
-cp "$ROOT_DIR/install.sh" "$LINUX_STAGE/install.sh"
-cp "$ROOT_DIR/run.sh" "$LINUX_STAGE/run.sh"
-cp "$ROOT_DIR/install.bat" "$WINDOWS_STAGE/install.bat"
-cp "$ROOT_DIR/run.bat" "$WINDOWS_STAGE/run.bat"
+cp "$ROOT_DIR/scripts/install.sh" "$LINUX_STAGE/install.sh"
+cp "$ROOT_DIR/scripts/run.sh" "$LINUX_STAGE/run.sh"
+cp "$ROOT_DIR/scripts/install.bat" "$WINDOWS_STAGE/install.bat"
+cp "$ROOT_DIR/scripts/run.bat" "$WINDOWS_STAGE/run.bat"
 
 cp "$LINUX_BIN" "$LINUX_STAGE/bin/n-body-sim"
 cp "$WINDOWS_BIN" "$WINDOWS_STAGE/bin/n-body-sim.exe"

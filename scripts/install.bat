@@ -1,9 +1,24 @@
 @echo off
 setlocal
 
-set "VENV_DIR=.venv"
+:: Determine script directory
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%.") do set "SCRIPT_DIR=%%~fI"
+
+:: Locate the root directory by checking for requirements.txt
+if exist "%SCRIPT_DIR%\requirements.txt" (
+    set "ROOT_DIR=%SCRIPT_DIR%"
+) else if exist "%SCRIPT_DIR%\..\requirements.txt" (
+    for %%I in ("%SCRIPT_DIR%\..") do set "ROOT_DIR=%%~fI"
+) else (
+    echo [ERROR] Could not locate requirements.txt
+    pause
+    exit /b 1
+)
+
+set "VENV_DIR=%ROOT_DIR%\.venv"
 set "PYTHON_VENV=%VENV_DIR%\Scripts\python.exe"
-set "REQ_FILE=requirements.txt"
+set "REQ_FILE=%ROOT_DIR%\requirements.txt"
 
 :: Check Python is installed
 where python >nul 2>&1

@@ -1,9 +1,22 @@
 #!/bin/bash
 set -e
 
-VENV_DIR=".venv"
+# Determine script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Locate the root directory by checking for requirements.txt
+if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
+    ROOT_DIR="$SCRIPT_DIR"
+elif [ -f "$SCRIPT_DIR/../requirements.txt" ]; then
+    ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+else
+    echo "[ERROR] Could not locate requirements.txt"
+    exit 1
+fi
+
+VENV_DIR="$ROOT_DIR/.venv"
 PYTHON_VENV="$VENV_DIR/bin/python"
-REQ_FILE="requirements.txt"
+REQ_FILE="$ROOT_DIR/requirements.txt"
 
 # Check Python is installed
 if command -v python3 >/dev/null 2>&1; then
