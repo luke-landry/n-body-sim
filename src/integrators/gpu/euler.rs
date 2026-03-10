@@ -1,6 +1,6 @@
-use crate::gpu::gravity::GpuGravity;
-use crate::gpu::integrators::GpuIntegrator;
-use crate::gpu::{CudaManager, device_bodies::DeviceBodies};
+use crate::gpu::{cuda_manager::CudaManager, device_bodies::DeviceBodies};
+use crate::gravity::GpuGravity;
+use crate::integrators::gpu::gpu_integrator::GpuIntegrator;
 use cudarc::driver::PushKernelArg;
 
 pub struct GpuEulerIntegrator {

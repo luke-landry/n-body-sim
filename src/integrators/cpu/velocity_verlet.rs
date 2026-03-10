@@ -1,7 +1,7 @@
 use crate::{
     body::Bodies,
     gravity::Gravity,
-    integrators::{Accelerations, Integrator, compute_acceleration},
+    integrators::cpu::integrator::{Accelerations, Integrator, compute_acceleration},
 };
 
 pub struct VelocityVerletIntegrator {

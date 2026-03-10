@@ -6,7 +6,7 @@ use n_body_sim::args::{
     Args, GravityMethod,
     GravityMethod::{BarnesHut, Newton, NewtonParallel},
 };
-use n_body_sim::simulation::Parameters;
+use n_body_sim::simulation::SimulationParameters;
 
 /*
   Criterion benchmarks for n-body simulation gravity methods
@@ -82,7 +82,7 @@ fn bench_all_methods_acceleration(c: &mut Criterion) {
 
 fn bench_gravity_methods(c: &mut Criterion, gravity_methods: &[GravityMethod], n_values: &[usize]) {
     let args = Args::default();
-    let parameters = Parameters::new(
+    let parameters = SimulationParameters::new(
         args.time_step,
         args.num_steps,
         args.g_constant,

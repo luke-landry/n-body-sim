@@ -9,7 +9,7 @@ use n_body_sim::args::{
     IntegratorMethod::{Euler, RungeKutta, VelocityVerlet},
 };
 use n_body_sim::body::Bodies;
-use n_body_sim::simulation::Parameters;
+use n_body_sim::simulation::SimulationParameters;
 
 /*
   Criterion benchmarks for n-body simulation integrators
@@ -74,7 +74,7 @@ fn bench_integrator_methods(
     n_values: &[usize],
 ) {
     let args = Args::default();
-    let parameters = Parameters::new(
+    let parameters = SimulationParameters::new(
         args.time_step,
         args.num_steps,
         args.g_constant,

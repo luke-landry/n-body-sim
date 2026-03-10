@@ -8,3 +8,4 @@ pub mod integrators;
 pub mod n_body_sim;
 mod output;
 pub mod simulation;
+pub mod simulation_runner;
