@@ -3,7 +3,7 @@ use common_bench::generate_distributed_bodies_positions;
 
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use n_body_sim::args::{Args, GravityMethod::BarnesHut};
-use n_body_sim::simulation::Parameters;
+use n_body_sim::simulation::SimulationParameters;
 
 /*
   Criterion benchmarks for n-body simulation barnes-hut method
@@ -38,7 +38,7 @@ fn bench_barnes_hut_method(c: &mut Criterion, theta_values: &[f64], n_values: &[
 
     let mut group = c.benchmark_group("BarnesHut-theta");
     for &theta_value in theta_values {
-        let parameters = Parameters::new(
+        let parameters = SimulationParameters::new(
             args.time_step,
             args.num_steps,
             args.g_constant,

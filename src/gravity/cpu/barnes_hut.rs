@@ -1,6 +1,8 @@
 pub mod octree;
 
-use crate::gravity::{Gravity, barnes_hut::octree::BarnesHutOctree, newton::compute_acceleration};
+use crate::gravity::{
+    Gravity, cpu::barnes_hut::octree::BarnesHutOctree, cpu::newton::compute_acceleration,
+};
 use rayon::prelude::*;
 
 pub struct BarnesHutGravity {

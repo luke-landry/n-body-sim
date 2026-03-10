@@ -1,23 +1,23 @@
 use crate::args::Args;
 use crate::body::Body;
-use crate::gpu::CudaManager;
-use crate::gpu::device_bodies::DeviceBodies;
-use crate::gpu::simulation::GpuSimulator;
 use crate::input;
-use crate::output::{SimulationData, SimulationDataWriter};
-use crate::simulation::{Parameters, Simulation, Simulator};
+use crate::output::SimulationDataWriter;
+use crate::simulation::cpu_simulation::CpuSimulation;
+use crate::simulation::gpu_simulation::GpuSimulation;
+use crate::simulation::{Simulation, SimulationParameters};
+use crate::simulation_runner::SimulationRunner;
 use std::error::Error;
-use std::sync::mpsc::Sender;
 
 pub struct NBodySim {
     simulation: Box<dyn Simulation>,
+    runner: SimulationRunner,
     writer: SimulationDataWriter,
 }
 
 impl NBodySim {
     pub fn new(args: Args) -> Result<Self, Box<dyn Error>> {
         let bodies = input::load_bodies(&args.initial_conditions_path)?;
-        let parameters = Parameters::new(
+        let parameters = SimulationParameters::new(
             args.time_step,
             args.num_steps,
             args.g_constant,
@@ -27,23 +27,29 @@ impl NBodySim {
         );
 
         let (tx, rx) = std::sync::mpsc::channel();
-        let simulation = Self::create_simulation(&args, parameters, bodies, Some(tx));
+        let simulation = Self::create_simulation(&args, parameters, bodies);
+        let runner = SimulationRunner::new(args.num_steps, args.progress, tx);
         let writer = SimulationDataWriter::new(args.output_data_path.clone(), rx);
-
-        Ok(Self { simulation, writer })
+        Ok(Self {
+            simulation,
+            runner,
+            writer,
+        })
     }
 
     pub fn run(self) -> Result<(), Box<dyn Error>> {
         let writer = self.writer;
-        let mut simulation = self.simulation;
+        let mut runner = self.runner;
+        let simulation = self.simulation;
 
         // run writer and simulator in separate threads
         let writer_handle = std::thread::spawn(move || writer.run());
-        let simulation_handle = std::thread::spawn(move || simulation.run());
+        let simulation_handle =
+            std::thread::spawn(move || runner.run(simulation).map_err(|e| e.to_string()));
 
         simulation_handle
             .join()
-            .map_err(|_| "Simulation thread panicked")?;
+            .map_err(|_| "Simulation thread panicked")??;
 
         // wait for writer to finish after simulation completes
         writer_handle
@@ -54,32 +60,26 @@ impl NBodySim {
 
     fn create_simulation(
         args: &Args,
-        parameters: Parameters,
+        parameters: SimulationParameters,
         bodies: Vec<Body>,
-        tx: Option<Sender<SimulationData>>,
     ) -> Box<dyn Simulation> {
         if args.gpu {
-            let gpu = CudaManager::new().expect("Failed to initialize GPU for simulation");
-            gpu.gpu_init_check()
-                .expect("GPU initialization check failed");
-            let device_bodies = DeviceBodies::new(&gpu, &bodies.as_slice().into())
-                .expect("Failed to create GPU device bodies");
             let gravity = args.gravity.gpu_create(&parameters);
             let integrator = args.integrator.gpu_create(parameters.time_step);
-            Box::new(GpuSimulator::new(
-                gpu,
-                parameters,
-                device_bodies,
-                gravity,
-                integrator,
-                tx,
-            ))
+            Box::new(
+                GpuSimulation::new(parameters, bodies.as_slice(), gravity, integrator)
+                    .expect("Failed to initialize GPU simulation"),
+            )
         } else {
             let gravity = args.gravity.create(&parameters, bodies.len());
             let integrator = args
                 .integrator
                 .create(gravity, parameters.time_step, bodies.len());
-            Box::new(Simulator::new(bodies, parameters, integrator, tx))
+            Box::new(CpuSimulation::new(
+                parameters,
+                bodies.as_slice(),
+                integrator,
+            ))
         }
     }
 }

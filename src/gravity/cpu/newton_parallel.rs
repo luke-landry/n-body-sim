@@ -1,5 +1,5 @@
 use crate::gravity::Gravity;
-use crate::gravity::newton::compute_acceleration_for_body;
+use crate::gravity::cpu::newton::compute_acceleration_for_body;
 use rayon::prelude::*;
 
 pub struct NewtonParallelGravity {

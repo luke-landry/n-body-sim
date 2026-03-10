@@ -1,9 +1,9 @@
-pub mod euler;
-// pub mod velocity_verlet; -- not implemented yet
-// pub mod runge_kutta; -- not implemented yet
-
-use crate::gpu::{CudaManager, device_bodies::DeviceBodies, gravity::GpuGravity};
 use std::error::Error;
+
+use crate::{
+    gpu::{cuda_manager::CudaManager, device_bodies::DeviceBodies},
+    gravity::GpuGravity,
+};
 
 pub trait GpuIntegrator: Send {
     fn step(

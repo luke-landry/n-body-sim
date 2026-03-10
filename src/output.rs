@@ -2,6 +2,24 @@ use csv;
 use serde::Serialize;
 use std::{io::BufWriter, io::Write, path::PathBuf};
 
+pub struct SimulationSnapshot {
+    pub time: f64,
+    pub pos_x: Vec<f64>,
+    pub pos_y: Vec<f64>,
+    pub pos_z: Vec<f64>,
+}
+
+impl SimulationSnapshot {
+    pub fn new(time: f64, pos_x: Vec<f64>, pos_y: Vec<f64>, pos_z: Vec<f64>) -> Self {
+        SimulationSnapshot {
+            time,
+            pos_x,
+            pos_y,
+            pos_z,
+        }
+    }
+}
+
 pub struct SimulationData {
     times: Vec<f64>,
     ids: Vec<u64>,
@@ -29,12 +47,13 @@ impl SimulationData {
         self.times.len()
     }
 
-    pub fn extend_from_step(&mut self, time: f64, pos_x: &[f64], pos_y: &[f64], pos_z: &[f64]) {
-        self.times.extend(std::iter::repeat(time).take(pos_x.len()));
-        self.ids.extend(0..pos_x.len() as u64);
-        self.pos_x.extend_from_slice(pos_x);
-        self.pos_y.extend_from_slice(pos_y);
-        self.pos_z.extend_from_slice(pos_z);
+    pub fn extend_from_snapshot(&mut self, snapshot: &SimulationSnapshot) {
+        let n = snapshot.pos_x.len();
+        self.times.extend(std::iter::repeat_n(snapshot.time, n));
+        self.ids.extend(0..n as u64);
+        self.pos_x.extend_from_slice(&snapshot.pos_x);
+        self.pos_y.extend_from_slice(&snapshot.pos_y);
+        self.pos_z.extend_from_slice(&snapshot.pos_z);
     }
 }
 

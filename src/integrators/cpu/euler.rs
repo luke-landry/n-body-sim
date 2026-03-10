@@ -1,6 +1,6 @@
 use crate::body::Bodies;
-use crate::integrators::{Accelerations, compute_acceleration};
-use crate::{gravity::Gravity, integrators::Integrator};
+use crate::gravity::Gravity;
+use crate::integrators::cpu::integrator::{Accelerations, Integrator, compute_acceleration};
 
 pub struct EulerIntegrator {
     gravity: Box<dyn Gravity>,

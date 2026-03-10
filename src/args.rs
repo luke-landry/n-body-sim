@@ -1,15 +1,17 @@
 use crate::constants;
-use crate::gpu::gravity::GpuGravity;
-use crate::gpu::gravity::newton_parallel::GpuNewtonParallelGravity;
-use crate::gpu::integrators::GpuIntegrator;
+use crate::gravity::GpuGravity;
+use crate::gravity::gpu::newton_parallel::GpuNewtonParallelGravity;
 use crate::gravity::{
-    Gravity, barnes_hut::BarnesHutGravity, newton::NewtonGravity,
-    newton_parallel::NewtonParallelGravity,
+    Gravity, cpu::barnes_hut::BarnesHutGravity, cpu::newton::NewtonGravity,
+    cpu::newton_parallel::NewtonParallelGravity,
 };
-use crate::integrators::{
-    Integrator, euler::EulerIntegrator, velocity_verlet::VelocityVerletIntegrator,
+use crate::integrators::cpu::{
+    euler::EulerIntegrator, integrator::Integrator, runge_kutta::RungeKuttaIntegrator,
+    velocity_verlet::VelocityVerletIntegrator,
 };
-use crate::simulation::Parameters;
+use crate::integrators::gpu::euler::GpuEulerIntegrator;
+use crate::integrators::gpu::gpu_integrator::GpuIntegrator;
+use crate::simulation::SimulationParameters;
 use clap::{Parser, ValueEnum};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -87,7 +89,7 @@ pub enum GravityMethod {
 }
 
 impl GravityMethod {
-    pub fn create(&self, parameters: &Parameters, n: usize) -> Box<dyn Gravity> {
+    pub fn create(&self, parameters: &SimulationParameters, n: usize) -> Box<dyn Gravity> {
         match self {
             GravityMethod::Newton => Box::new(NewtonGravity::new(
                 parameters.g_constant,
@@ -106,7 +108,7 @@ impl GravityMethod {
         }
     }
 
-    pub fn gpu_create(&self, parameters: &Parameters) -> Box<dyn GpuGravity> {
+    pub fn gpu_create(&self, parameters: &SimulationParameters) -> Box<dyn GpuGravity> {
         match self {
             GravityMethod::NewtonParallel => Box::new(GpuNewtonParallelGravity::new(
                 parameters.g_constant,
@@ -155,18 +157,14 @@ impl IntegratorMethod {
                 gravity, time_step, num_bodies,
             )),
             IntegratorMethod::RungeKutta => {
-                Box::new(crate::integrators::runge_kutta::RungeKuttaIntegrator::new(
-                    gravity, time_step, num_bodies,
-                ))
+                Box::new(RungeKuttaIntegrator::new(gravity, time_step, num_bodies))
             }
         }
     }
 
     pub fn gpu_create(&self, time_step: f64) -> Box<dyn GpuIntegrator> {
         match self {
-            IntegratorMethod::Euler => Box::new(
-                crate::gpu::integrators::euler::GpuEulerIntegrator::new(time_step),
-            ),
+            IntegratorMethod::Euler => Box::new(GpuEulerIntegrator::new(time_step)),
             _ => unimplemented!(
                 "GPU-accelerated version of {:?} integrator method is not implemented yet",
                 self

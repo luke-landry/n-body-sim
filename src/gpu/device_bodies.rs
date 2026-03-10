@@ -1,7 +1,7 @@
 use cudarc::driver::CudaSlice;
 use std::error::Error;
 
-use crate::{body::Bodies, gpu::CudaManager};
+use crate::{body::Bodies, gpu::cuda_manager::CudaManager};
 
 /// SoA representation of bodies on the GPU
 pub struct DeviceBodies {

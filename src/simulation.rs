@@ -1,8 +1,9 @@
-use crate::body::{Bodies, Body};
-use crate::integrators::Integrator;
-use crate::output::SimulationData;
-use std::sync::mpsc::Sender;
-pub struct Parameters {
+pub mod cpu_simulation;
+pub mod gpu_simulation;
+
+use crate::output::SimulationSnapshot;
+use std::error::Error;
+pub struct SimulationParameters {
     /// Time step size in seconds
     pub time_step: f64,
 
@@ -23,7 +24,7 @@ pub struct Parameters {
     pub progress: bool,
 }
 
-impl Parameters {
+impl SimulationParameters {
     pub fn new(
         time_step: f64,
         num_steps: usize,
@@ -32,7 +33,7 @@ impl Parameters {
         theta: f64,
         progress: bool,
     ) -> Self {
-        Parameters {
+        SimulationParameters {
             time_step,
             num_steps,
             g_constant,
@@ -44,83 +45,6 @@ impl Parameters {
 }
 
 pub trait Simulation: Send {
-    fn run(&mut self);
-}
-
-pub struct Simulator {
-    bodies: Vec<Body>,
-    parameters: Parameters,
-    integrator: Box<dyn Integrator>,
-    tx: Option<Sender<SimulationData>>,
-}
-
-impl Simulator {
-    // Max size of a batch of simulation data to send in bytes
-    const BATCH_SIZE_BYTES: usize = 16000000;
-
-    // Number of simulation data records that fit in a batch of BATCH_SIZE_BYTES bytes
-    const BATCH_SIZE: usize = Self::BATCH_SIZE_BYTES / SimulationData::RECORD_SIZE_BYTES;
-
-    pub fn new(
-        bodies: Vec<Body>,
-        parameters: Parameters,
-        integrator: Box<dyn Integrator>,
-        tx: Option<Sender<SimulationData>>,
-    ) -> Self {
-        Simulator {
-            bodies,
-            parameters,
-            integrator,
-            tx,
-        }
-    }
-}
-
-impl Simulation for Simulator {
-    fn run(&mut self) {
-        let mut bodies = Bodies::from(self.bodies.as_slice());
-        let mut buffer = SimulationData::with_capacity(Self::BATCH_SIZE); // TODO optimize batch size
-        let one_percent_steps = (self.parameters.num_steps / 100).max(1);
-        let mut time = 0.0;
-
-        // main simulation loop
-        for step in 0..self.parameters.num_steps {
-            if let Some(tx) = &self.tx {
-                // record current time step simulation data in the buffer
-                buffer.extend_from_step(time, &bodies.pos_x, &bodies.pos_y, &bodies.pos_z);
-
-                if buffer.len() >= Self::BATCH_SIZE {
-                    // avoid cloning the buffer by replacing it with an
-                    // empty one and sending the full batch to the output channel
-                    let batch = std::mem::replace(
-                        &mut buffer,
-                        SimulationData::with_capacity(Self::BATCH_SIZE),
-                    );
-                    if let Err(e) = tx.send(batch) {
-                        eprintln!(
-                            "Failed to send simulation data batch: {}\nHalting simulation.",
-                            e
-                        );
-                        return;
-                    }
-                }
-            }
-
-            self.integrator.step(&mut bodies);
-            time += self.parameters.time_step;
-
-            if self.parameters.progress && step % one_percent_steps == 0 {
-                println!("{}", (step * 100) / self.parameters.num_steps);
-            }
-        }
-
-        // record final state and send remaining data
-        buffer.extend_from_step(time, &bodies.pos_x, &bodies.pos_y, &bodies.pos_z);
-        if let Some(tx) = &self.tx {
-            if let Err(e) = tx.send(buffer) {
-                eprintln!("Failed to send final simulation data batch: {}", e);
-                return;
-            }
-        }
-    }
+    fn step(&mut self) -> Result<(), Box<dyn Error>>;
+    fn snapshot(&self) -> Result<SimulationSnapshot, Box<dyn Error>>;
 }

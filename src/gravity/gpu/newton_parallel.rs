@@ -1,5 +1,9 @@
-use crate::gpu::{self, CudaManager, gravity::GpuGravity};
 use cudarc::driver::{LaunchConfig, PushKernelArg};
+
+use crate::{
+    gpu::{self, cuda_manager::CudaManager},
+    gravity::GpuGravity,
+};
 
 pub struct GpuNewtonParallelGravity {
     g_constant: f64,

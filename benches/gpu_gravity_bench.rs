@@ -4,9 +4,9 @@ use std::sync::OnceLock;
 use common_bench::generate_distributed_bodies_positions;
 
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
-use n_body_sim::gpu::CudaManager;
+use n_body_sim::gpu::cuda_manager::CudaManager;
 use n_body_sim::gpu::device_bodies::DeviceBodies;
-use n_body_sim::simulation::Parameters;
+use n_body_sim::simulation::SimulationParameters;
 use n_body_sim::{
     args::{
         Args,
@@ -49,7 +49,7 @@ fn bench_gpu_newton_parallel_acceleration(c: &mut Criterion) {
 
 fn bench_gravity_methods(c: &mut Criterion, gravity_methods: &[GravityMethod], n_values: &[usize]) {
     let args = Args::default();
-    let parameters = Parameters::new(
+    let parameters = SimulationParameters::new(
         args.time_step,
         args.num_steps,
         args.g_constant,
