@@ -1,0 +1,1 @@
+Disc galaxy generated with 3000 bodies and a 10-unit radius.
