@@ -14,6 +14,4 @@ pub mod gpu {
     pub mod gpu_integrator;
 
     pub mod euler;
-    // pub mod velocity_verlet; -- not implemented yet
-    // pub mod runge_kutta; -- not implemented yet
 }

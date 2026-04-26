@@ -2,6 +2,7 @@ use std::error::Error;
 
 use crate::{
     body::{Bodies, Body},
+    gravity::Gravity,
     integrators::cpu::integrator::Integrator,
     output::SimulationSnapshot,
     simulation::{Simulation, SimulationParameters},
@@ -10,6 +11,7 @@ use crate::{
 pub struct CpuSimulation {
     parameters: SimulationParameters,
     bodies: Bodies,
+    gravity: Box<dyn Gravity>,
     integrator: Box<dyn Integrator>,
     time: f64,
 }
@@ -18,6 +20,7 @@ impl CpuSimulation {
     pub fn new(
         parameters: SimulationParameters,
         bodies: &[Body],
+        gravity: Box<dyn Gravity>,
         integrator: Box<dyn Integrator>,
     ) -> Self {
         // convert AoS body data to SoA format
@@ -25,6 +28,7 @@ impl CpuSimulation {
         Self {
             parameters,
             bodies,
+            gravity,
             integrator,
             time: 0.0,
         }
@@ -33,7 +37,7 @@ impl CpuSimulation {
 
 impl Simulation for CpuSimulation {
     fn step(&mut self) -> Result<(), Box<dyn Error>> {
-        self.integrator.step(&mut self.bodies);
+        self.integrator.step(&mut self.bodies, &mut *self.gravity);
         self.time += self.parameters.time_step;
         Ok(())
     }

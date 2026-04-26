@@ -9,9 +9,7 @@ pub mod cpu {
 }
 
 pub mod gpu {
-    // pub mod newton; -- not implemented since single-threaded Newton does not make sense on a GPU
     pub mod newton_parallel;
-    // pub mod barnes_hut; -- not implemented yet
 }
 
 pub trait Gravity: Send {

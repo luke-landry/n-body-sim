@@ -95,11 +95,8 @@ fn bench_integrator_methods(
                         b.iter_batched_ref(
                             || {
                                 (
-                                    integrator_method.create(
-                                        gravity_method.create(&parameters, n),
-                                        parameters.time_step,
-                                        n,
-                                    ),
+                                    integrator_method.create(parameters.time_step, n),
+                                    gravity_method.create(&parameters, n),
                                     Bodies::new(
                                         masses.clone(),
                                         rx.clone(),
@@ -111,8 +108,8 @@ fn bench_integrator_methods(
                                     ),
                                 )
                             },
-                            |(integrator, bodies)| {
-                                integrator.step(bodies);
+                            |(integrator, gravity, bodies)| {
+                                integrator.step(bodies, &mut **gravity);
                             },
                             BatchSize::SmallInput,
                         );

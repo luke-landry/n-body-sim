@@ -44,5 +44,5 @@ pub fn compute_acceleration(
 }
 
 pub trait Integrator: Send {
-    fn step(&mut self, bodies: &mut Bodies);
+    fn step(&mut self, bodies: &mut Bodies, gravity: &mut dyn Gravity);
 }

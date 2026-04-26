@@ -30,8 +30,8 @@ criterion_group!(
     */
     // bench_euler_step,
     // bench_velocity_verlet_step,
-    // bench_runge_kutta_step,
-    bench_all_methods_step,
+    bench_runge_kutta_step,
+    // bench_all_methods_step,
 );
 criterion_main!(benches);
 
@@ -63,7 +63,7 @@ fn bench_runge_kutta_step(c: &mut Criterion) {
 fn bench_all_methods_step(c: &mut Criterion) {
     let integrator_methods = [Euler, VelocityVerlet, RungeKutta];
     let gravity_methods = [Newton];
-    let n_values = [20, 40, 60, 80, 100];
+    let n_values = [25, 50, 75, 100];
     bench_integrator_methods(c, &integrator_methods, &gravity_methods, &n_values);
 }
 
@@ -110,11 +110,8 @@ fn bench_integrator_methods(
                         b.iter_batched_ref(
                             || {
                                 (
-                                    integrator_method.create(
-                                        gravity_method.create(&parameters, n),
-                                        parameters.time_step,
-                                        n,
-                                    ),
+                                    integrator_method.create(parameters.time_step, n),
+                                    gravity_method.create(&parameters, n),
                                     Bodies::new(
                                         masses.clone(),
                                         rx.clone(),
@@ -126,8 +123,8 @@ fn bench_integrator_methods(
                                     ),
                                 )
                             },
-                            |(integrator, bodies)| {
-                                integrator.step(bodies);
+                            |(integrator, gravity, bodies)| {
+                                integrator.step(bodies, gravity.as_mut());
                             },
                             BatchSize::SmallInput,
                         );

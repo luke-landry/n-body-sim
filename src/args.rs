@@ -143,21 +143,14 @@ pub enum IntegratorMethod {
 }
 
 impl IntegratorMethod {
-    pub fn create(
-        &self,
-        gravity: Box<dyn Gravity>,
-        time_step: f64,
-        num_bodies: usize,
-    ) -> Box<dyn Integrator> {
+    pub fn create(&self, time_step: f64, num_bodies: usize) -> Box<dyn Integrator> {
         match self {
-            IntegratorMethod::Euler => {
-                Box::new(EulerIntegrator::new(gravity, time_step, num_bodies))
+            IntegratorMethod::Euler => Box::new(EulerIntegrator::new(time_step, num_bodies)),
+            IntegratorMethod::VelocityVerlet => {
+                Box::new(VelocityVerletIntegrator::new(time_step, num_bodies))
             }
-            IntegratorMethod::VelocityVerlet => Box::new(VelocityVerletIntegrator::new(
-                gravity, time_step, num_bodies,
-            )),
             IntegratorMethod::RungeKutta => {
-                Box::new(RungeKuttaIntegrator::new(gravity, time_step, num_bodies))
+                Box::new(RungeKuttaIntegrator::new(time_step, num_bodies))
             }
         }
     }

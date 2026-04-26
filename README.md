@@ -16,14 +16,9 @@ This project implements an N-body simulator that models the gravitational intera
   - [Initial Conditions](#initial-conditions)
   - [Output Data](#output-data)
 - [Build](#build)
+- [Architecture](#architecture)
 - [Theory](#theory)
-    - [Integrators](#integrators)
-    - [Gravity](#gravity)
 - [Benchmarks](#benchmarks)
-    - [Integrators](#integrators)
-    - [Gravity](#gravity)
-    - [GPU Acceleration](#gpu-acceleration)
-- [Design](#design)
 - [License](#license)
 
 ## Quick Start
@@ -246,125 +241,77 @@ Release build archives can be created using the `scripts/release.sh` script, whi
 
 ## Theory
 
-The **N-body problem** involves predicting the individual motions of a group of objects interacting through gravitational force.
-- **2-Body problem**: Systems with two objects (e.g., a planet and a moon) have a "closed-form" solution. A single mathematical formula can calculate their exact positions at any point in the future.
-- **3-Body problem**: When a third object is added, the system becomes complex. Because the gravitational force on each object depends on the positions of all other objects, their motions are described by coupled differential equations. There is no general closed-form formula to solve these equations exactly. Instead, the system must be solved numerically by calculating the state of the system in small, successive time increments.
+The **N-body problem** involves predicting the motions of objects interacting through gravitational force. For 3+ bodies there is no closed-form solution, so the system must be integrated numerically in small time steps, and generally becomes chaotic (highly sensitive to initial conditions).
 
-For 3+ bodies, the system generally becomes chaotic, which means it is highly sensitive to initial conditions. Two systems starting with a difference even as small as one millimeter in position could eventually diverge into completely different configurations.
+**Integrators** update body positions and velocities each step:
+- **Semi-implicit Euler**: first-order symplectic; fastest, least accurate
+- **Velocity Verlet**: second-order symplectic; ~2× slower than Euler, better long-term energy conservation
+- **Runge-Kutta (RK4)**: non-symplectic; ~4× slower than Euler, highest short-term accuracy
 
-### **Integrators**
-Integrators are algorithms that update the position and velocity of each body at every time step.
-- **Semi-implicit Euler**: A first-order symplectic integrator modified from the non-symplectic standard Euler method. It is simple and efficient but not the most accurate.
-- **Velocity Verlet**: A second-order symplectic integrator that provides improved accuracy by evaluating accelerations at the beginning and end of each time step and using both to update positions and velocities.
-- **Runge-Kutta**: The fourth-order Runge-Kutta method (RK4) is a non-symplectic integrator that achieves high accuracy by evaluating derivatives at four distinct points within each time step and combining them in a weighted average to update the state.
+**Gravity methods** compute forces between bodies:
+- **Newton**: exact $O(n^2)$, single-threaded; fastest for $n \lt 100$
+- **Newton Parallel**: exact $O(n^2)$, multi-threaded; fastest for $100 \leq n \lt 1000$
+- **Barnes-Hut**: approximate $O(n\ log\ n)$ octree; fastest for $n \geq 1000$
 
-
-In non-symplectic integrators, such as the standard Euler or Runge-Kutta methods, numerical rounding errors accumulate, causing the system to gain or lose energy over time (e.g., planets spiraling into the sun). Symplectic integrators keep these energy errors bounded, ensuring that orbits remain stable over long simulation periods. Symplectic integrators are generally more accurate for long-term simulations while non-symplectic higher-order integrators may be preferred for short-term accuracy.
-
-### **Gravity**
-These algorithms calculate the gravitational forces exerted on each body.
-- **Newton**: Calculates the force between every pair of bodies directly. This is perfectly accurate but slow for large systems, with a time complexity of $O(n^2)$.
-- **Newton Parallel**: A multi-threaded version of the Newton method that calculates the forces on all bodies in parallel, improving performance for large systems compared to the single-threaded Newton method, but still has a time complexity of $O(n^2)$.
-- **Barnes-Hut**: An algorithm used for large-scale simulation (e.g. galaxies). It organizes bodies into an octree, treating distant groups of objects as a single combined mass based on a given approximation threshold $\theta$ (theta). This introduces a small approximation error but significantly improves performance to $O(n\ log\ n)$.
-
-While the **Newton** method is the slowest method in general, it has no threading overhead and so ends up being the fastest for small numbers of bodies. The **Newton Parallel** method becomes significantly faster than the single-threaded Newton method for larger numbers of bodies due to its use of multiple threads, but still has a quadratic time complexity. The **Barnes-Hut** method has a better time complexity than the Newton methods, and is also implemented as multi-threaded. However it has much more overhead from having to build and traverse an octree along with the threading overhead, so it is only most efficient in very large systems. 
-
-The **Barnes-Hut** approximation criterion is $\frac{s}{d} < \theta$, where $s$ is the size (width) of the cubic octree cell containing the group of bodies being approximated, $d$ is the distance from the center of mass of that cell to the body for which the force is being calculated, and $\theta$ is the approximation threshold. If this criterion is satisfied, it means the group of bodies in that cell is sufficiently far away and can be approximated as a single combined mass located at the center of mass of the cell. If not, the algorithm recursively checks the child cells of that octree cell until it finds cells that satisfy the approximation criterion or reaches leaf cells containing individual bodies. The smaller and further away a cell is, the more likely it is to satisfy the approximation criterion and be treated as a single combined mass, while closer and larger cells are more likely to fail the approximation criterion and are not approximated. By approximating distant groups of bodies as single masses, the Barnes-Hut algorithm reduces the number of force calculations needed, improving performance while introducing a small approximation error that can be controlled by adjusting the $\theta$ parameter. More information: [Barnes-Hut Simulation - Wikipedia](https://en.wikipedia.org/wiki/Barnes%E2%80%93Hut_simulation)
-
-See the [Benchmarks](#benchmarks) section for detailed performance comparisons of these methods and algorithms at various numbers of bodies.
-
-#### **Softening Factor**
-Gravitational force is calculated using Newton's Law of Universal Gravitation:
-
-$$
-F=G\frac{m_1m_2}{r^2}
-$$
-
-To prevent numerical singularities when two bodies pass very close to each other, this simulator uses a softening factor ($\epsilon$). When the distance ($r$) between bodies approaches zero, the ($1/r^2$) term approaches infinity, so this factor is added to the distance in the gravity force calculation to ensure it remains finite:
-
-$$
-F=G\frac{m_1m_2}{r^2+\epsilon^2}
-$$
-
-A larger $\epsilon$ increases numerical stability by smoothing out interactions, but it makes the simulation less physically accurate at short ranges. A smaller $\epsilon$ provides higher physical accuracy but increases the risk of numerical instability during close encounters.
+See [docs/theory.md](docs/theory.md) for full derivations, the symplectic vs non-symplectic tradeoff, the Barnes-Hut approximation criterion, and the softening factor.
 
 ## Benchmarks
-This project uses the criterion crate for benchmarking the physics engine. The benchmarks can be run using `cargo bench` and the results will be saved to the `target/criterion` directory as HTML reports which include automatically-generated graphs. To benchmark the gravity methods only, use `cargo bench --bench gravity_bench`, and to benchmark the integrators only, use `cargo bench --bench integrator_bench`. To configure the gravity methods, integrator methods, and n-values used in the benchmarks, edit the `gravity_bench.rs` and `integrator_bench.rs` files in the `benches` directory.
 
-The benchmarks for GPU accelerated gravity and integrator methods are implemented in the `gpu_gravity_bench.rs` and `gpu_integrator_bench.rs` files. To run these benchmarks specifically, use `cargo bench --bench gpu_gravity_bench` and `cargo bench --bench gpu_integrator_bench`.
-
-**Note:** criterion tries to use `gnuplot` by default to generate graphs for the benchmark reports, so you may want to install it on your system. Otherwise, it uses the `plotters` crate to generate graphs.
-
-The following benchmarks for integrators and gravity methods were done on a mini-PC with an Intel Core i5-12450H (8C/12T, up to 4.4GHz) CPU and 32GB of DDR4 3200MHz RAM running Ubuntu Server 24.04.
-
-
-### Integrators
-This benchmark compares the three integrators: Euler, Velocity-Verlet, and Runge-Kutta using the same gravity method (Newton) across different numbers of bodies. The x-axis represents the number of bodies, and the y axis is time to compute a single step of the simulation.
-
-![benchmark-e-vs-vv-vs-rk-u-n](images/benchmark-e-vs-vv-vs-rk-u-n.svg)
-
-This shows that the Euler integrator is the fastest, followed by Velocity-Verlet which is approximately 2x slower than Euler, and then Runge-Kutta which is approximately 4x slower than Euler. This is because Euler, Velocity Verlet, and Runge-Kutta perform 1, 2, and 4, acceleration calculations per step, respectively. So, given the same same gravity methods, the time difference between the integrators is a relatively consistent factor of 1x, 2x, or 4x for Euler, Velocity-Verlet, or Runge-Kutta, as the acceleration calculations dominate the overall computation time. The Euler method while being fast is the least accurate of the three, while the relatively slow Runge-Kutta is the most accurate, so there is a tradeoff between performance and accuracy when choosing an integrator.
-
-### Gravity
-These benchmarks compare the three gravity calculation methods: Newton, Newton Parallel, and Barnes-Hut across different numbers of bodies. The x-axis represents the number of bodies, and the y axis is time to compute a single set of accelerations for all bodies. For the Barnes-Hut method, an approximation threshold of $\theta=0.5$ was used.
+Benchmarks use the [criterion](https://github.com/bheisler/criterion.rs) crate (`cargo bench`). Key results on an Intel i5-12450H (8C/12T):
+- Euler → Velocity Verlet → RK4 step times scale ~1:2:4, dominated by the number of gravity evaluations per step
+- Newton Parallel outperforms single-threaded Newton for $n \geq 100$; Barnes-Hut outperforms Newton Parallel for $n \geq 1000$
 
 ![benchmark-n-vs-np-vs-bh](images/benchmark-n-vs-np-vs-bh.svg)
-![benchmark-np-vs-bh](images/benchmark-np-vs-bh.svg)
-![benchmark-n-vs-np](images/benchmark-n-vs-np.svg)
 
-These show that the single-threaded Newton method is the fastest for $n\lt 100$, while the multi-threaded Newton Parallel method becomes significantly faster than the single-threaded Newton method for $n\geq 100$, but still has a quadratic time complexity. The Barnes-Hut method has a better time complexity than the Newton methods, but much more initial overhead, so it is most efficient for large systems of $n\geq 1000$. Note that these exact n-value thresholds can vary based on the specific hardware that the benchmarks are run on, and especially the number of CPU cores available, which directly affects the performance of the multi-threaded Newton Parallel and Barnes-Hut methods. The performance of the Barnes-Hut method is also affected by the given approximation threshold $\theta$.
+GPU acceleration (NVIDIA A100, FP64) outperforms CPU Newton Parallel for $n \geq 2000$, with near-linear apparent scaling due to massive parallelism:
 
-This next benchmark compares the Barnes-Hut method with different values of the approximation threshold $\theta$. The x-axis represents the number of bodies, and the y axis is time to compute a single set of accelerations for all bodies.
-
-
-![benchmark-bh-theta](images/benchmark-bh-theta.svg)
-
-At $\theta=0.0$, the Barnes-Hut method never approximates distant bodies, so it has the same accuracy and time complexity of $O(n^2)$ as the Newton methods. At $\theta=0.1$, there is already a large performance improvement, and as $\theta$ increases, the performance continues to improve but with diminishing returns. Increasing $\theta$ decreases the time it takes to compute the accelerations, but also decreases the accuracy of the simulation results.
-
-### GPU Acceleration
-The following benchmarks compare the GPU-accelerated versions of the implemented GPU-accelerated gravity and integrator methods to their CPU counterparts across different numbers of bodies. The GPU-accelerated methods are implemented using CUDA and run on NVIDIA GPUs.
-
-An important consideration with GPU acceleration is that this project uses FP64 (double precision) floating point numbers for the physics calculations to maintain higher accuracy during the simulation. In general, GPUs have much higher performance for FP32 (single precision) calculations compared to FP64. Also, most consumer-grade GPUs are optimized specifically for FP32 performance, so the difference in performance between FP32 and FP64 is even lower than the 1:2 ratio that would be expected based on the number of calculations alone. To get a direct 1:2 ratio, server-grade GPUs with better FP64 hardware support need to be used to make use of the full potential of GPU acceleration. 
-
-For example:
-- **NVIDIA A100 (server-grade GPU)**: Theoretical FP32 performance is 19.49 TFLOPS, and theoretical FP64 performance is 9.746 TFLOPS, which is approximately a 1:2 ratio ([source](https://www.techpowerup.com/gpu-specs/a100-pcie-40-gb.c3623)).
-- **NVIDIA RTX 5090 (consumer-grade GPU)**: Theoretical FP32 performance is 104.8 TFLOPS, but theoretical FP64 performance is only 1.637 TFLOPS, which is approximately a 1:64 ratio ([source](https://www.techpowerup.com/gpu-specs/geforce-rtx-5090.c4216)).
-
-This benchmark was run on a cloud instance with an NVIDIA A100 PCIe 40GB GPU, with an AMD EPYC 7B13 CPU (32 allocated vCores) and 128GB of allocated RAM running Ubuntu Server 24.04 with CUDA 12.8.
 ![benchmark-gpu-A100-np](images/benchmark-gpu-A100-np.svg)
 
-The GPU-accelerated Euler/Newton Parallel method has a much higher initial overhead than the CPU version, so it is only faster after approximately $n\geq 2000$. However, for those larger numbers of bodies, the GPU-accelerated version is significantly faster than the CPU version, with the performance gap increasing as n increases. While the time complexity is still $O(n^2)$ for both versions, the GPU-accelerated version has a much lower constant factor due to the massive parallelism of the GPU, and at this scale the GPU's performance looks nearly $O(n)$ (linear).
+See [docs/benchmarks.md](docs/benchmarks.md) for full results including integrator comparisons, Barnes-Hut theta sensitivity, and an RTX 5090 vs A100 GPU comparison.
 
-This next benchmark was run on a cloud instance with an NVIDIA RTX 5090 PCIe 32GB GPU, with an AMD Ryzen Threadripper PRO 7975WX CPU (16 allocated vCores) and 96GB of allocated RAM running Ubuntu Server 24.04 with CUDA 12.8.
-![benchmark-gpu-5090-np](images/benchmark-gpu-5090-np.svg)
-This shows the RTX 5090 has much lower FP64 performance compared to the A100, so the GPU-accelerated version is only faster than the CPU version after approximately $n\geq 18000$. However, as with the A100 benchmark, the performance gap continues to increase as n increases, and the GPU time still looks nearly $O(n)$ (linear) at this scale, but with a much higher constant factor than the A100.
+## Architecture
 
-## Design
-The project is organized into two main components: the Rust physics engine and the Python GUI tools. The physics engine is responsible for performing the N-body simulation, while the GUI tools provide an interface for configuring simulations and viewing results.
+The project has two components: a **Rust physics engine** (`src/`) and a **Python GUI** (`gui/`).
 
-### Rust Physics Engine
-Rust was chosen for the physics engine due to its performance, safety guarantees, and modern features. The engine is designed to be modular and extensible, allowing for easy addition of new integrators, gravity calculation methods, and other features in the future.
+### Physics Engine
 
-The source code of the Rust physics engine is in the `src` directory and contains the core logic for the N-body simulation, including the integrators, gravity calculation methods, and the core simulation loop. The integrators and gravity methods are implemented as traits, allowing for easy swapping and addition of new methods without modifying the core simulation logic. The core simulation loop iteratively updates the positions and velocities of the bodies based on the selected integrator and gravity method, and pushes the state of the system (body positions) at each step to a channel so as to not block the simulation for I/O operations, which are run in a separate thread. The simulation output data is streamed to a file in either CSV or binary format as it is generated, allowing for efficient handling of large simulations without consuming excessive memory storing huge generated datasets.
+The physics engine is structured to be modular and extensible, using traits to allow simulations across various configurations of gravity methods, integrators, and CPU vs GPU execution.
 
-The initial conditions are read into a vector of structs `bodies: Vec<Body>`, each containing the mass, position, and velocity of a body. This format is known as "array of structs" (AoS) which is intuitive and easy to work with for reading and writing file data. However, it is not the most efficient data format for computation, as the pointer-chasing required to access the fields of each body struct can lead to slower performance. It is also not an ideal format for performing vectorized operations for one field on all bodies at once during the simulation calculations, which is able to be accelerated with SIMD instructions.
+```mermaid
+graph TD
+    SR[SimulationRunner] --> SIM["Simulation trait"]
 
-A more efficient format for computation is "struct of arrays" (SoA), where the body properties (mass, position, velocity) are stored in a struct `bodies: Bodies` containing equal-length arrays where each element corresponds to a body (e.g. for accessing the mass of the 5th body, it would be `bodies[5].mass` for AoS, and `bodies.masses[5]` in SoA). This allows for better cache locality because similar data is stored contiguously in memory, improving performance during the simulation calculations which often require operations on the properties of all bodies at once, such as updating the positions or velocities of all bodies in a step.
+    SIM --> CPU[CpuSimulation]
+    SIM --> GPU[GpuSimulation]
 
-GPU acceleration was implemented by running the parallelizable parts of the simulation calculations on the GPU using CUDA. The body data is initially transferred to the GPU in SoA format for efficient computation, and the CPU passes pointers to the GPU memory where the body properties are stored each step, so that the GPU can directly read and write to those memory locations during the simulation calculations without needing to transfer large amounts of data back and forth between the CPU and GPU in between steps. To interact with GPU from Rust, the CUDA kernels are compiled to PTX intermediate representation at build time, and this PTX is included in the final executable. The 'cudarc' crate is used to call the CUDA driver API to load the PTX at runtime and then call the CUDA kernel functions.
+    CPU --> B["Bodies"]
+    CPU --> INT["Integrator trait"]
+    CPU --> GRAV["Gravity trait"]
+    INT --> EU[Euler] & VV[VelocityVerlet] & RK[RungeKutta]
+    GRAV --> N[Newton] & NP[NewtonParallel] & BH[BarnesHut]
 
-The simulation initial conditions are read from the CSV file into an AoS format, and then converted to an SoA format for the simulation calculations.
+    GPU --> DB["DeviceBodies (CUDA)"]
+    GPU --> GINT["GpuIntegrator trait"]
+    GPU --> GGRAV["GpuGravity trait"]
+    GINT --> GEU["GpuEuler (CUDA)"]
+    GGRAV --> GNP["GpuNewtonParallel (CUDA)"]
+```
 
-### Python GUI Tools
-The GUI tools are implemented in Python using the Qt framework and VisPy. Python was chosen for the GUI due to its rapid development speed and the availability of convenient libraries for handling large datasets, creating GUIs, and making interactive visualizations.
+The `SimulationRunner` drives a `Simulation` implementation, which can be either a `CpuSimulation` or `GpuSimulation`. The `CpuSimulation` uses regular CPU implementations of the `Bodies`, `Integrator`, and `Gravity` traits, while the `GpuSimulation` uses `DeviceBodies` and GPU-specific traits for integrators and gravity methods.
 
-The source code for the GUI tools is in the `gui` directory and contains the logic for the launcher and visualizer. The launcher allows users to configure simulation parameters, load initial conditions, generate random scenarios, and launch simulations. The visualizer provides an interactive 3D visualization of the simulation results, allowing users to play back the simulation and navigate the scene with different camera modes.
+### GUI Execution Flow
 
-The launcher runs the Rust physics engine executable as a subprocess, passing the necessary configuration arguments and initial conditions file path. This way, the simulation runs independently of the launcher, allowing the launcher to remain responsive during a simulation.
+```mermaid
+graph LR
+    L["Launcher"] -->|"spawn subprocess"| E["Physics Engine"]
+    E -->|"streams output to"| F["output.nbody"]
+    L -->|"spawn subprocess"| V["Visualizer"]
+    F -->|read| V
+```
 
-It also runs the visualizer (which is a Python script) as a separate subprocess. The reason the visualizer is run as a separate subprocess instead of just being imported and called directly from the launcher is so that the visualizer doesn't block the launcher when it is loading the simulation output data, which can take a long time for large simulations. While this could also be solved by running the visualizer in a separate thread instead of a separate process, threads can only be safely terminated cooperatively, but if the visualizer thread is blocked on file I/O it cannot cooperatively check for termination signals from the launcher until it finishes loading, so the launcher would be unable to force-quit the visualizer if it the user wanted to cancel loading early. By running the visualizer as a separate process, the launcher can simply kill the visualizer process, which is safe to do at any time.
+The Python UI launches the physics engine and visualizer as separate subprocesses. The physics engine writes output data to a file (`output.nbody`), which the visualizer loads and renders.
 
-Additional design notes are in the `docs` directory.
+See [docs/architecture.md](docs/architecture.md) for detailed design notes on AoS vs SoA, GPU memory management, the CUDA/PTX build pipeline, and the Python subprocess design decisions.
 
 ## License
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

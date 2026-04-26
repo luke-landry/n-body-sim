@@ -3,15 +3,13 @@ use crate::gravity::Gravity;
 use crate::integrators::cpu::integrator::{Accelerations, Integrator, compute_acceleration};
 
 pub struct EulerIntegrator {
-    gravity: Box<dyn Gravity>,
     time_step: f64,
     accelerations: Accelerations,
 }
 
 impl EulerIntegrator {
-    pub fn new(gravity: Box<dyn Gravity>, time_step: f64, num_bodies: usize) -> Self {
+    pub fn new(time_step: f64, num_bodies: usize) -> Self {
         EulerIntegrator {
-            gravity,
             time_step,
             accelerations: Accelerations {
                 ax: vec![0.0; num_bodies],
@@ -55,12 +53,12 @@ impl EulerIntegrator {
     energy from drifting away over time.
 */
 impl Integrator for EulerIntegrator {
-    fn step(&mut self, bodies: &mut Bodies) {
+    fn step(&mut self, bodies: &mut Bodies, gravity: &mut dyn Gravity) {
         let n = bodies.len();
         let dt = self.time_step;
 
         // 1. a_n = compute_acceleration(r_n)
-        compute_acceleration(&mut *self.gravity, bodies, &mut self.accelerations);
+        compute_acceleration(gravity, bodies, &mut self.accelerations);
 
         let (ax, ay, az) = self.accelerations.as_mut_slices();
         let (_, rx, ry, rz, vx, vy, vz) = bodies.as_slices_mut();

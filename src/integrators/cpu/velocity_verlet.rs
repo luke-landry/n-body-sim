@@ -5,16 +5,14 @@ use crate::{
 };
 
 pub struct VelocityVerletIntegrator {
-    gravity: Box<dyn Gravity>,
     time_step: f64,
     accelerations_current: Accelerations,
     accelerations_next: Accelerations,
 }
 
 impl VelocityVerletIntegrator {
-    pub fn new(gravity: Box<dyn Gravity>, time_step: f64, num_bodies: usize) -> Self {
+    pub fn new(time_step: f64, num_bodies: usize) -> Self {
         VelocityVerletIntegrator {
-            gravity,
             time_step,
             accelerations_current: Accelerations {
                 ax: vec![0.0; num_bodies],
@@ -61,7 +59,7 @@ impl VelocityVerletIntegrator {
     accurate than first-order methods like Euler's method, especially for larger time steps.
 */
 impl Integrator for VelocityVerletIntegrator {
-    fn step(&mut self, bodies: &mut Bodies) {
+    fn step(&mut self, bodies: &mut Bodies, gravity: &mut dyn Gravity) {
         self.accelerations_current.zero();
         self.accelerations_next.zero();
 
@@ -73,7 +71,7 @@ impl Integrator for VelocityVerletIntegrator {
         // to bodies in calculate_accelerations and the r and v variables
         {
             // 1. a_n = compute_acceleration(r_n)
-            compute_acceleration(&mut *self.gravity, bodies, &mut self.accelerations_current);
+            compute_acceleration(gravity, bodies, &mut self.accelerations_current);
 
             let (ax, ay, az) = self.accelerations_current.as_slices();
             let (_, rx, ry, rz, vx, vy, vz) = bodies.as_slices_mut();
@@ -87,7 +85,7 @@ impl Integrator for VelocityVerletIntegrator {
         }
         {
             // 3. a_(n+1) = compute_acceleration(r_(n+1))
-            compute_acceleration(&mut *self.gravity, bodies, &mut self.accelerations_next);
+            compute_acceleration(gravity, bodies, &mut self.accelerations_next);
 
             let (ax, ay, az) = self.accelerations_current.as_slices();
             let (ax_next, ay_next, az_next) = self.accelerations_next.as_slices();

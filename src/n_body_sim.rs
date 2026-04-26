@@ -72,12 +72,11 @@ impl NBodySim {
             )
         } else {
             let gravity = args.gravity.create(&parameters, bodies.len());
-            let integrator = args
-                .integrator
-                .create(gravity, parameters.time_step, bodies.len());
+            let integrator = args.integrator.create(parameters.time_step, bodies.len());
             Box::new(CpuSimulation::new(
                 parameters,
                 bodies.as_slice(),
+                gravity,
                 integrator,
             ))
         }
