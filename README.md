@@ -1,7 +1,7 @@
 # n-body-sim
 A simulator for how multiple objects in space (bodies) move and interact with each other through gravity.
 
-![cover](images/cover.png)
+![galaxy-sim](images/galaxy-sim.gif)
 
 ## Overview
 This project implements an N-body simulator that models the gravitational interactions between bodies in 3D using various numerical integration methods and algorithms. The physics engine is written in Rust, and the GUI is implemented in Python using the Qt framework and VisPy.
@@ -16,9 +16,9 @@ This project implements an N-body simulator that models the gravitational intera
   - [Initial Conditions](#initial-conditions)
   - [Output Data](#output-data)
 - [Build](#build)
-- [Architecture](#architecture)
 - [Theory](#theory)
 - [Benchmarks](#benchmarks)
+- [Architecture](#architecture)
 - [License](#license)
 
 ## Quick Start
@@ -257,7 +257,7 @@ See [docs/theory.md](docs/theory.md) for full derivations, the symplectic vs non
 
 ## Benchmarks
 
-Benchmarks use the [criterion](https://github.com/bheisler/criterion.rs) crate (`cargo bench`). Key results on an Intel i5-12450H (8C/12T):
+Benchmarks use the `criterion` crate (`cargo bench`). Key results on an Intel i5-12450H (8C/12T):
 - Euler → Velocity Verlet → RK4 step times scale ~1:2:4, dominated by the number of gravity evaluations per step
 - Newton Parallel outperforms single-threaded Newton for $n \geq 100$; Barnes-Hut outperforms Newton Parallel for $n \geq 1000$
 

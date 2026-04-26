@@ -1,6 +1,6 @@
 # Benchmarks
 
-This project uses the [criterion](https://github.com/bheisler/criterion.rs) crate for benchmarking the physics engine. The benchmarks can be run using `cargo bench` and the results will be saved to the `target/criterion` directory as HTML reports which include automatically-generated graphs. To benchmark the gravity methods only, use `cargo bench --bench gravity_bench`, and to benchmark the integrators only, use `cargo bench --bench integrator_bench`. To configure the gravity methods, integrator methods, and n-values used in the benchmarks, edit the `gravity_bench.rs` and `integrator_bench.rs` files in the `benches` directory.
+This project uses the `criterion` crate for benchmarking the physics engine. The benchmarks can be run using `cargo bench` and the results will be saved to the `target/criterion` directory as HTML reports which include automatically-generated graphs. To benchmark the gravity methods only, use `cargo bench --bench gravity_bench`, and to benchmark the integrators only, use `cargo bench --bench integrator_bench`. To configure the gravity methods, integrator methods, and n-values used in the benchmarks, edit the `gravity_bench.rs` and `integrator_bench.rs` files in the `benches` directory.
 
 The benchmarks for GPU accelerated gravity and integrator methods are implemented in the `gpu_gravity_bench.rs` and `gpu_integrator_bench.rs` files. To run these benchmarks specifically, use `cargo bench --bench gpu_gravity_bench` and `cargo bench --bench gpu_integrator_bench`.
 
